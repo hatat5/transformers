@@ -375,6 +375,7 @@ class GPT2Model(GPT2PreTrainedModel):
         head_mask=None,
         inputs_embeds=None,
         use_cache=True,
+        z_conditioning=None,
     ):
         r"""
     Return:
@@ -480,6 +481,10 @@ class GPT2Model(GPT2PreTrainedModel):
         else:
             token_type_embeds = 0
         hidden_states = inputs_embeds + position_embeds + token_type_embeds
+
+        if z_conditioning is not None:
+            hidden_states += z_conditioning.repeat(1,inputs_embeds.size(1), 1)
+
         hidden_states = self.drop(hidden_states)
 
         output_shape = input_shape + (hidden_states.size(-1),)
@@ -505,6 +510,10 @@ class GPT2Model(GPT2PreTrainedModel):
 
             if self.output_attentions:
                 all_attentions.append(outputs[2])
+
+            if z_conditioning is not None:
+                hidden_states += z_conditioning.repeat(1,inputs_embeds.size(1), 1)
+
 
         hidden_states = self.ln_f(hidden_states)
 
@@ -547,7 +556,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         if past:
             input_ids = input_ids[:, -1].unsqueeze(-1)
 
-        return {"input_ids": input_ids, "past": past, "use_cache": kwargs["use_cache"]}
+        return {"input_ids": input_ids, "past": past, "use_cache": kwargs["use_cache"], "z_conditioning": kwargs["z_conditioning"]}
 
     @add_start_docstrings_to_callable(GPT2_INPUTS_DOCSTRING)
     def forward(
@@ -561,6 +570,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         inputs_embeds=None,
         labels=None,
         use_cache=True,
+        z_conditioning=None,
     ):
         r"""
         labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size, sequence_length)`, `optional`, defaults to :obj:`None`):
@@ -613,6 +623,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
+            z_conditioning=z_conditioning,
         )
         hidden_states = transformer_outputs[0]
 
