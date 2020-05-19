@@ -364,6 +364,23 @@ class GPT2Model(GPT2PreTrainedModel):
         for layer, heads in heads_to_prune.items():
             self.h[layer].attn.prune_heads(heads)
 
+    def process_z(self, hidden_states, z_conditioning, w_matrix, num_experts_z=1, sequence_attention_z=False):
+        projected_z_conditioning = torch.einsum('bky, byd -> bkd',
+                                                z_conditioning,
+                                                w_matrix)
+
+        expert_pre_softmax = torch.einsum('bld, bkd -> blk', hidden_states.clone(), projected_z_conditioning)
+        expert_weights = torch.nn.functional.softmax(expert_pre_softmax, dim = 2)
+
+        ensemble_z_conditioning = torch.einsum('blk, bkd -> bld', expert_weights, projected_z_conditioning)
+
+        if sequence_attention_z is True:
+            attn_wts = torch.nn.functional.softmax(
+                torch.einsum('blh, blh -> bl', ensemble_z_conditioning, hidden_states.clone()), dim=1)
+            return torch.einsum('bl, bld -> bld', attn_wts, ensemble_z_conditioning)
+        else:
+            return ensemble_z_conditioning
+
     @add_start_docstrings_to_callable(GPT2_INPUTS_DOCSTRING)
     def forward(
         self,
@@ -376,6 +393,10 @@ class GPT2Model(GPT2PreTrainedModel):
         inputs_embeds=None,
         use_cache=True,
         z_conditioning=None,
+        w_matrix=None,
+        where_to_plug_z=None,
+        num_experts_z=1,
+        sequence_attention_z=False,
     ):
         r"""
     Return:
@@ -482,8 +503,12 @@ class GPT2Model(GPT2PreTrainedModel):
             token_type_embeds = 0
         hidden_states = inputs_embeds + position_embeds + token_type_embeds
 
-        if z_conditioning is not None:
-            hidden_states += z_conditioning.repeat(1,inputs_embeds.size(1), 1)
+        if z_conditioning is not None and 'embedding' in where_to_plug_z:
+            hidden_states += self.process_z(hidden_states=hidden_states,
+                                            z_conditioning=z_conditioning,
+                                            w_matrix=w_matrix,
+                                            num_experts_z=num_experts_z,
+                                            sequence_attention_z=sequence_attention_z)
 
         hidden_states = self.drop(hidden_states)
 
@@ -511,9 +536,12 @@ class GPT2Model(GPT2PreTrainedModel):
             if self.output_attentions:
                 all_attentions.append(outputs[2])
 
-            if z_conditioning is not None:
-                hidden_states += z_conditioning.repeat(1,inputs_embeds.size(1), 1)
-
+            if z_conditioning is not None and 'every_layer' in where_to_plug_z:
+                hidden_states += self.process_z(hidden_states=hidden_states,
+                                                z_conditioning=z_conditioning,
+                                                w_matrix=w_matrix,
+                                                num_experts_z=num_experts_z,
+                                                sequence_attention_z=sequence_attention_z)
 
         hidden_states = self.ln_f(hidden_states)
 
@@ -556,7 +584,14 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         if past:
             input_ids = input_ids[:, -1].unsqueeze(-1)
 
-        return {"input_ids": input_ids, "past": past, "use_cache": kwargs["use_cache"], "z_conditioning": kwargs["z_conditioning"]}
+        return {"input_ids": input_ids,
+                "past": past,
+                "use_cache": kwargs["use_cache"],
+                "z_conditioning": kwargs["z_conditioning"],
+                "w_matrix": kwargs["w_matrix"],
+                "where_to_plug_z": kwargs["where_to_plug_z"],
+                "num_experts_z": kwargs["num_experts_z"],
+                "sequence_attention_z": kwargs["sequence_attention_z"]}
 
     @add_start_docstrings_to_callable(GPT2_INPUTS_DOCSTRING)
     def forward(
@@ -571,6 +606,10 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         labels=None,
         use_cache=True,
         z_conditioning=None,
+        w_matrix=None,
+        where_to_plug_z=None,
+        num_experts_z=1,
+        sequence_attention_z=False,
     ):
         r"""
         labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size, sequence_length)`, `optional`, defaults to :obj:`None`):
@@ -624,8 +663,19 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             z_conditioning=z_conditioning,
+            w_matrix=w_matrix,
+            where_to_plug_z=where_to_plug_z,
+            num_experts_z=num_experts_z,
+            sequence_attention_z=sequence_attention_z,
         )
         hidden_states = transformer_outputs[0]
+
+        if 'lm_head' in where_to_plug_z:
+            hidden_states += self.transformer.process_z(hidden_states=hidden_states,
+                                                        z_conditioning=z_conditioning,
+                                                        w_matrix=w_matrix,
+                                                        num_experts_z=num_experts_z,
+                                                        sequence_attention_z=sequence_attention_z)
 
         lm_logits = self.lm_head(hidden_states)
 
