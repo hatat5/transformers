@@ -507,7 +507,6 @@ class GPT2Model(GPT2PreTrainedModel):
             hidden_states += self.process_z(hidden_states=hidden_states,
                                             z_conditioning=z_conditioning,
                                             w_matrix=w_matrix,
-                                            num_experts_z=num_experts_z,
                                             sequence_attention_z=sequence_attention_z)
 
         hidden_states = self.drop(hidden_states)
@@ -540,7 +539,6 @@ class GPT2Model(GPT2PreTrainedModel):
                 hidden_states += self.process_z(hidden_states=hidden_states,
                                                 z_conditioning=z_conditioning,
                                                 w_matrix=w_matrix,
-                                                num_experts_z=num_experts_z,
                                                 sequence_attention_z=sequence_attention_z)
 
         hidden_states = self.ln_f(hidden_states)
@@ -674,7 +672,6 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             hidden_states += self.transformer.process_z(hidden_states=hidden_states,
                                                         z_conditioning=z_conditioning,
                                                         w_matrix=w_matrix,
-                                                        num_experts_z=num_experts_z,
                                                         sequence_attention_z=sequence_attention_z)
 
         lm_logits = self.lm_head(hidden_states)
