@@ -366,7 +366,7 @@ class GPT2Model(GPT2PreTrainedModel):
 
     def process_z(self, hidden_states, projected_z_conditioning, sequence_attention_z=False):
         self.expert_pre_softmax = torch.einsum('bld, bkd -> blk', hidden_states, projected_z_conditioning).requires_grad_(True)
-        self.expert_weights = torch.nn.functional.softmax(self.expert_pre_softmax, dim = 2).requires_grad_(True)
+        self.expert_weights = torch.nn.functional.softmax(self.expert_pre_softmax, dim=2).requires_grad_(True)
 
         self.ensemble_z_conditioning = torch.einsum('blk, bkd -> bld', self.expert_weights, projected_z_conditioning).requires_grad_(True)
 
