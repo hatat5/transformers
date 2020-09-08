@@ -364,27 +364,21 @@ class GPT2Model(GPT2PreTrainedModel):
         for layer, heads in heads_to_prune.items():
             self.h[layer].attn.prune_heads(heads)
 
-    def process_z(self, hidden_states, z_conditioning, w_matrix, sequence_attention_z=False):
-        #b = 32
-        #k = num_experts = 1
-        #d = 768
-        #y = d/k = 768
-        #l = sequence length
-        projected_z_conditioning = torch.einsum('bky, byd -> bkd',
-                                                z_conditioning,
-                                                w_matrix)
-
-        expert_pre_softmax = torch.einsum('bld, bkd -> blk', hidden_states.clone(), projected_z_conditioning)
-        expert_weights = torch.nn.functional.softmax(expert_pre_softmax, dim = 2)
-
-        ensemble_z_conditioning = torch.einsum('blk, bkd -> bld', expert_weights, projected_z_conditioning)
+    def process_z(self, hidden_states, projected_z_conditioning, sequence_attention_z=False, sequence_expert_weights=None):
+        if sequence_expert_weights is None:
+            self.expert_pre_softmax = torch.einsum('bld, bkd -> blk', hidden_states, projected_z_conditioning).requires_grad_(True)
+            self.expert_weights = torch.nn.functional.softmax(self.expert_pre_softmax, dim=2).requires_grad_(True)
+            self.ensemble_z_conditioning = torch.einsum('blk, bkd -> bld', self.expert_weights, projected_z_conditioning).requires_grad_(True)
+        else:
+            self.ensemble_z_conditioning = torch.einsum('blk, bkd -> bld', sequence_expert_weights, projected_z_conditioning).requires_grad_(True)
 
         if sequence_attention_z is True:
-            attn_wts = torch.nn.functional.softmax(
-                torch.einsum('blh, blh -> bl', ensemble_z_conditioning, hidden_states.clone()), dim=1)
-            return torch.einsum('bl, bld -> bld', attn_wts, ensemble_z_conditioning)
+            self.attn_wts = torch.nn.functional.softmax(
+                torch.einsum('blh, blh -> bl', self.ensemble_z_conditioning, hidden_states), dim=1).requires_grad_(True)
+            self.applied_attn = torch.einsum('bl, bld -> bld', self.attn_wts, self.ensemble_z_conditioning).requires_grad_(True)
+            return self.applied_attn
         else:
-            return ensemble_z_conditioning
+            return self.ensemble_z_conditioning
 
     @add_start_docstrings_to_callable(GPT2_INPUTS_DOCSTRING)
     def forward(
@@ -397,11 +391,11 @@ class GPT2Model(GPT2PreTrainedModel):
         head_mask=None,
         inputs_embeds=None,
         use_cache=True,
-        z_conditioning=None,
-        w_matrix=None,
+        projected_z_conditioning=None,
         where_to_plug_z=None,
         num_experts_z=1,
         sequence_attention_z=False,
+        sequence_expert_weights=None,
     ):
         r"""
     Return:
@@ -508,11 +502,22 @@ class GPT2Model(GPT2PreTrainedModel):
             token_type_embeds = 0
         hidden_states = inputs_embeds + position_embeds + token_type_embeds
 
-        if z_conditioning is not None and 'embedding' in where_to_plug_z:
-            hidden_states += self.process_z(hidden_states=hidden_states,
-                                            z_conditioning=z_conditioning,
-                                            w_matrix=w_matrix,
-                                            sequence_attention_z=sequence_attention_z)
+
+        if sequence_expert_weights is not None:
+            print(past_length)
+            if hidden_states.size(1) == 1: #in decoding
+                which_vec = min(past_length, sequence_expert_weights.size(1) - 1)
+                sequence_expert_weights = sequence_expert_weights[:, which_vec, ...].unsqueeze(1)
+            else:
+                sequence_expert_weights = sequence_expert_weights
+
+
+
+        if projected_z_conditioning is not None and 'embedding' in where_to_plug_z:
+            hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
+                                                           projected_z_conditioning=projected_z_conditioning,
+                                                           sequence_attention_z=sequence_attention_z,
+                                                           sequence_expert_weights=sequence_expert_weights)
 
         hidden_states = self.drop(hidden_states)
 
@@ -540,11 +545,11 @@ class GPT2Model(GPT2PreTrainedModel):
             if self.output_attentions:
                 all_attentions.append(outputs[2])
 
-            if z_conditioning is not None and 'every_layer' in where_to_plug_z:
-                hidden_states += self.process_z(hidden_states=hidden_states,
-                                                z_conditioning=z_conditioning,
-                                                w_matrix=w_matrix,
-                                                sequence_attention_z=sequence_attention_z)
+            if projected_z_conditioning is not None and 'every_layer' in where_to_plug_z:
+                hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
+                                                               projected_z_conditioning=projected_z_conditioning,
+                                                               sequence_attention_z=sequence_attention_z,
+                                                               sequence_expert_weights=sequence_expert_weights,)
 
         hidden_states = self.ln_f(hidden_states)
 
@@ -590,11 +595,17 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         return {"input_ids": input_ids,
                 "past": past,
                 "use_cache": kwargs["use_cache"],
-                "z_conditioning": kwargs["z_conditioning"],
-                "w_matrix": kwargs["w_matrix"],
+                "projected_z_conditioning": kwargs["projected_z_conditioning"],
                 "where_to_plug_z": kwargs["where_to_plug_z"],
                 "num_experts_z": kwargs["num_experts_z"],
-                "sequence_attention_z": kwargs["sequence_attention_z"]}
+                "sequence_attention_z": kwargs["sequence_attention_z"],
+                "sequence_expert_weights": kwargs["sequence_expert_weights"]}
+
+    def zero_gradients(self):
+        self.zero_grad()
+        for attribute in ['expert_pre_softmax', 'expert_weights', 'ensemble_z_conditioning', 'attn_wts', 'applied_attn']:
+            if hasattr(self.transformer, attribute):
+                getattr(self.transformer, attribute).grad = None
 
     @add_start_docstrings_to_callable(GPT2_INPUTS_DOCSTRING)
     def forward(
@@ -608,11 +619,11 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         inputs_embeds=None,
         labels=None,
         use_cache=True,
-        z_conditioning=None,
-        w_matrix=None,
+        projected_z_conditioning=None,
         where_to_plug_z=None,
         num_experts_z=1,
         sequence_attention_z=False,
+        sequence_expert_weights=None,
     ):
         r"""
         labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size, sequence_length)`, `optional`, defaults to :obj:`None`):
@@ -665,19 +676,19 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
-            z_conditioning=z_conditioning,
-            w_matrix=w_matrix,
+            projected_z_conditioning=projected_z_conditioning,
             where_to_plug_z=where_to_plug_z,
             num_experts_z=num_experts_z,
             sequence_attention_z=sequence_attention_z,
+            sequence_expert_weights=sequence_expert_weights,
         )
         hidden_states = transformer_outputs[0]
 
         if 'lm_head' in where_to_plug_z:
-            hidden_states += self.transformer.process_z(hidden_states=hidden_states,
-                                                        z_conditioning=z_conditioning,
-                                                        w_matrix=w_matrix,
-                                                        sequence_attention_z=sequence_attention_z)
+            hidden_states = hidden_states + self.transformer.process_z(hidden_states=hidden_states,
+                                                                       projected_z_conditioning=projected_z_conditioning,
+                                                                       sequence_attention_z=sequence_attention_z,
+                                                                       sequence_expert_weights=sequence_expert_weights)
 
         lm_logits = self.lm_head(hidden_states)
 
