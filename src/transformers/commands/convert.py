@@ -1,7 +1,8 @@
 from argparse import ArgumentParser, Namespace
-from logging import getLogger
 
 from transformers.commands import BaseTransformersCLICommand
+
+from ..utils import logging
 
 
 def convert_command_factory(args: Namespace):
@@ -52,7 +53,7 @@ class ConvertCommand(BaseTransformersCLICommand):
         finetuning_task_name: str,
         *args
     ):
-        self._logger = getLogger("transformers-cli/converting")
+        self._logger = logging.get_logger("transformers-cli/converting")
 
         self._logger.info("Loading model {}".format(model_type))
         self._model_type = model_type
@@ -62,7 +63,21 @@ class ConvertCommand(BaseTransformersCLICommand):
         self._finetuning_task_name = finetuning_task_name
 
     def run(self):
-        if self._model_type == "bert":
+        if self._model_type == "albert":
+            try:
+                from transformers.convert_albert_original_tf_checkpoint_to_pytorch import (
+                    convert_tf_checkpoint_to_pytorch,
+                )
+            except ImportError:
+                msg = (
+                    "transformers can only be used from the commandline to convert TensorFlow models in PyTorch, "
+                    "In that case, it requires TensorFlow to be installed. Please see "
+                    "https://www.tensorflow.org/install/ for installation instructions."
+                )
+                raise ImportError(msg)
+
+            convert_tf_checkpoint_to_pytorch(self._tf_checkpoint, self._config, self._pytorch_dump_output)
+        elif self._model_type == "bert":
             try:
                 from transformers.convert_bert_original_tf_checkpoint_to_pytorch import (
                     convert_tf_checkpoint_to_pytorch,
@@ -140,5 +155,13 @@ class ConvertCommand(BaseTransformersCLICommand):
             )
 
             convert_xlm_checkpoint_to_pytorch(self._tf_checkpoint, self._pytorch_dump_output)
+        elif self._model_type == "lxmert":
+            from transformers.convert_lxmert_original_pytorch_checkpoint_to_pytorch import (
+                convert_lxmert_checkpoint_to_pytorch,
+            )
+
+            convert_lxmert_checkpoint_to_pytorch(self._tf_checkpoint, self._pytorch_dump_output)
         else:
-            raise ValueError("--model_type should be selected in the list [bert, gpt, gpt2, transfo_xl, xlnet, xlm]")
+            raise ValueError(
+                "--model_type should be selected in the list [bert, gpt, gpt2, transfo_xl, xlnet, xlm, lxmert]"
+            )
