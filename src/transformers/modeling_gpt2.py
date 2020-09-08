@@ -365,6 +365,11 @@ class GPT2Model(GPT2PreTrainedModel):
             self.h[layer].attn.prune_heads(heads)
 
     def process_z(self, hidden_states, z_conditioning, w_matrix, sequence_attention_z=False):
+        #b = 32
+        #k = num_experts = 1
+        #d = 768
+        #y = d/k = 768
+        #l = sequence length
         projected_z_conditioning = torch.einsum('bky, byd -> bkd',
                                                 z_conditioning,
                                                 w_matrix)
