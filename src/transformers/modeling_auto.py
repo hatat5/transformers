@@ -44,6 +44,8 @@ from .configuration_auto import (
     XLMConfig,
     XLMRobertaConfig,
     XLNetConfig,
+    BasicTMEncoderConfig,
+    BasicTMDecoderConfig,
 )
 from .configuration_marian import MarianConfig
 from .configuration_utils import PretrainedConfig
@@ -71,6 +73,10 @@ from .modeling_bert import (
     BertForTokenClassification,
     BertLMHeadModel,
     BertModel,
+)
+from .modeling_basic_tm import (
+    PretrainedTranslationModelEncoder,
+    PretrainedTranslationModelDecoder,
 )
 from .modeling_camembert import (
     CamembertForCausalLM,
@@ -203,6 +209,8 @@ MODEL_MAPPING = OrderedDict(
         (ElectraConfig, ElectraModel),
         (ReformerConfig, ReformerModel),
         (LxmertConfig, LxmertModel),
+        (BasicTMEncoderConfig, PretrainedTranslationModelEncoder),
+        (BasicTMDecoderConfig, PretrainedTranslationModelDecoder),
     ]
 )
 
@@ -254,6 +262,7 @@ MODEL_WITH_LM_HEAD_MAPPING = OrderedDict(
         (ElectraConfig, ElectraForMaskedLM),
         (EncoderDecoderConfig, EncoderDecoderModel),
         (ReformerConfig, ReformerModelWithLMHead),
+        (BasicTMDecoderConfig, PretrainedTranslationModelDecoder),
     ]
 )
 
