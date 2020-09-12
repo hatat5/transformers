@@ -55,12 +55,12 @@ class TranslationModel(nn.Module):
 
         self.decoder_type = hparams['decoder_type']
 
-        self.encoder = NMTEncoder(hparams=hparams,
+        self.encoder = NMTEncoder(encoder_params=hparams['encoder'],
                                   src_vocab_size=src_vocab_size,
                                   src_padding_idx=src_padding_idx)
 
         if self.decoder_type == 'transformer_decoder':
-            self.decoder = NMTDecoder(hparams=hparams,
+            self.decoder = NMTDecoder(decoder_params=hparams['decoder'],
                                       tgt_vocab_size=tgt_vocab_size,
                                       tgt_padding_idx=tgt_padding_idx)
         elif self.decoder_type == 'gpt2':
@@ -118,13 +118,13 @@ class PositionalEncoding(nn.Module):
 
 class NMTEncoder(PretrainedTranslationModelEncoder, nn.Module):
     def __init__(self,
-                 hparams: Dict,
+                 encoder_params: Dict,
                  src_vocab_size: int,
                  src_padding_idx: int):
 
         super(NMTEncoder, self).__init__()
 
-        self.encoder_params = hparams['encoder']
+        self.encoder_params = encoder_params
         self.src_embedding = nn.Embedding(num_embeddings=src_vocab_size,
                                           embedding_dim=self.encoder_params['embedding_dim'],
                                           padding_idx=src_padding_idx)
@@ -162,12 +162,12 @@ class NMTEncoder(PretrainedTranslationModelEncoder, nn.Module):
 
 class NMTDecoder(PretrainedTranslationModelDecoder, nn.Module):
     def __init__(self,
-                 hparams: Dict,
+                 decoder_params: Dict,
                  tgt_vocab_size: int,
                  tgt_padding_idx: int):
 
         super(NMTDecoder, self).__init__()
-        self.decoder_params = hparams['decoder']
+        self.decoder_params = decoder_params
 
         self.tgt_embedding = nn.Embedding(num_embeddings=tgt_vocab_size+1,
                                           embedding_dim=self.decoder_params['embedding_dim'],
