@@ -17,6 +17,7 @@ class BasicTMEncoderConfig(PretrainedConfig):
 
         self.vocab_size = tokenizer.vocab_size
         self.encoder_params = encoder_params
+        self.tokenizer = tokenizer
 
 
 class BasicTMDecoderConfig(PretrainedConfig):
@@ -32,3 +33,4 @@ class BasicTMDecoderConfig(PretrainedConfig):
 
         self.vocab_size = tokenizer.vocab_size
         self.decoder_params = decoder_params
+        self.tokenizer = tokenizer
