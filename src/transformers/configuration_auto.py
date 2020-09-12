@@ -43,6 +43,7 @@ from .configuration_utils import PretrainedConfig
 from .configuration_xlm import XLM_PRETRAINED_CONFIG_ARCHIVE_MAP, XLMConfig
 from .configuration_xlm_roberta import XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP, XLMRobertaConfig
 from .configuration_xlnet import XLNET_PRETRAINED_CONFIG_ARCHIVE_MAP, XLNetConfig
+from .configuration_basic_tm import BasicTMConfig
 
 
 ALL_PRETRAINED_CONFIG_ARCHIVE_MAP = dict(
@@ -172,6 +173,10 @@ CONFIG_MAPPING = OrderedDict(
             "lxmert",
             LxmertConfig,
         ),
+        (
+            "basic_tm_model",
+            BasicTMConfig,
+        )
     ]
 )
 
