@@ -5,12 +5,12 @@ import math
 from typing import Optional
 from typing import Dict
 from .modeling_utils import PreTrainedModel
-from .configuration_basic_tm import BasicTMConfig
+from .configuration_basic_tm import BasicTMEncoderConfig, BasicTMDecoderConfig
 from .modeling_bart import SinusoidalPositionalEmbedding
 
 
-class PretrainedTranslationModel(PreTrainedModel):
-    config_class = BasicTMConfig
+class PretrainedTranslationModelEncoder(PreTrainedModel):
+    config_class = BasicTMEncoderConfig
     base_model_prefix = "model"
 
     def _init_weights(self, module):
@@ -26,7 +26,24 @@ class PretrainedTranslationModel(PreTrainedModel):
             if module.padding_idx is not None:
                 module.weight.data[module.padding_idx].zero_()
 
-class TranslationModel(PretrainedTranslationModel):
+class PretrainedTranslationModelDecoder(PreTrainedModel):
+    config_class = BasicTMDecoderConfig
+    base_model_prefix = "model"
+
+    def _init_weights(self, module):
+        std = self.config.init_std
+        if isinstance(module, nn.Linear):
+            module.weight.data.normal_(mean=0.0, std=std)
+            if module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, SinusoidalPositionalEmbedding):
+            pass
+        elif isinstance(module, nn.Embedding):
+            module.weight.data.normal_(mean=0.0, std=std)
+            if module.padding_idx is not None:
+                module.weight.data[module.padding_idx].zero_()
+
+class TranslationModel(nn.Module):
     def __init__(self,
                  hparams: Dict,
                  src_vocab_size: int,
@@ -99,7 +116,7 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
 
-class NMTEncoder(nn.Module):
+class NMTEncoder(PretrainedTranslationModelEncoder, nn.Module):
     def __init__(self,
                  hparams: Dict,
                  src_vocab_size: int,
@@ -143,7 +160,7 @@ class NMTEncoder(nn.Module):
                                src_key_padding_mask=src_key_padding_mask)
         return encoded
 
-class NMTDecoder(nn.Module):
+class NMTDecoder(PretrainedTranslationModelDecoder, nn.Module):
     def __init__(self,
                  hparams: Dict,
                  tgt_vocab_size: int,
