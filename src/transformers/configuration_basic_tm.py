@@ -6,7 +6,7 @@ from .tokenization_gpt2 import GPT2Tokenizer
 logger = logging.get_logger(__name__)
 
 class BasicTMEncoderConfig(PretrainedConfig):
-    model_type = "basic_tm"
+    model_type = "basic_tm_encoder"
     def __init__(self,
                  hparams: Dict,
                  tokenizer):
@@ -19,7 +19,7 @@ class BasicTMEncoderConfig(PretrainedConfig):
 
 
 class BasicTMDecoderConfig(PretrainedConfig):
-    model_type = "basic_tm"
+    model_type = "basic_tm_decoder"
     def __init__(self,
                  hparams: Dict,
                  tokenizer: GPT2Tokenizer):
