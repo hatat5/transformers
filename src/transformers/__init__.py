@@ -277,7 +277,8 @@ if is_torch_available():
         load_tf_weights_in_bert,
     )
     from .modeling_basic_tm import (
-        PretrainedTranslationModel,
+        PretrainedTranslationModelEncoder,
+        PretrainedTranslationModelDecoder,
         TranslationModel,
         NMTEncoder,
         NMTDecoder,
