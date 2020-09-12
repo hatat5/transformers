@@ -282,6 +282,7 @@ MODEL_FOR_CAUSAL_LM_MAPPING = OrderedDict(
         ),  # XLM can be MLM and CLM => model should be split similar to BERT; leave here for now
         (CTRLConfig, CTRLLMHeadModel),
         (ReformerConfig, ReformerModelWithLMHead),
+        (BasicTMDecoderConfig, PretrainedTranslationModelDecoder),
     ]
 )
 
