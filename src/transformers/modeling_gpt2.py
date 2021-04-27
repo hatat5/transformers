@@ -485,7 +485,7 @@ class GPT2Model(GPT2PreTrainedModel):
             # Since we are adding it to the raw scores before the softmax, this is
             # effectively the same as removing these entirely.
             attention_mask = attention_mask.to(dtype=next(self.parameters()).dtype)  # fp16 compatibility
-            attention_mask = (1.0 - attention_mask) * -10000.0
+            attention_mask = (1.0 - attention_mask) * torch.finfo(attention_mask.dtype).min
 
         # Prepare head mask if needed
         # 1.0 in head_mask indicate we keep the head
