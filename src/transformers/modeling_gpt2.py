@@ -488,8 +488,8 @@ class GPT2Model(GPT2PreTrainedModel):
             self.h[layer].attn.prune_heads(heads)
 
     def process_z(self, hidden_states, projected_z_conditioning):
-        l = hidden_states.size(1)
-        reshaped_projected_z_conditioning = projected_z_conditioning.repeat(1,l,1).requires_grad_(True)
+        seqlen = hidden_states.size(1)
+        reshaped_projected_z_conditioning = projected_z_conditioning.repeat(1, seqlen, 1).requires_grad_(True)
         return reshaped_projected_z_conditioning
 
     @add_start_docstrings_to_callable(GPT2_INPUTS_DOCSTRING)
