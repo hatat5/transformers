@@ -565,7 +565,7 @@ class GPT2Model(GPT2PreTrainedModel):
         else:
             past_length = past_key_values[0][0].size(-2)
 
-        if z_input_strategy == 'prompt':
+        if z_input_strategy == 'prompt' and projected_z_conditioning is not None:
             new_input_shape = []
             for i in range(len(input_shape)-1):
                 new_input_shape.append(input_shape[i])
@@ -624,19 +624,22 @@ class GPT2Model(GPT2PreTrainedModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
+
         position_embeds = self.wpe(position_ids)
+
         if token_type_ids is not None:
             token_type_embeds = self.wte(token_type_ids)
         else:
             token_type_embeds = 0
 
-        if z_input_strategy == 'prompt':
-            if inputs_embeds.shape[1] == 1:
-                inputs_embeds = torch.cat((inputs_embeds[:, 0, :].unsqueeze(1), projected_z_conditioning), dim=1)
-            elif inputs_embeds.shape[1] > 1:
-                inputs_embeds = torch.cat((inputs_embeds[:, 0, :].unsqueeze(1), projected_z_conditioning, inputs_embeds[:, 1:, :]), dim=1)
-            else:
-                raise ValueError(f"{inputs_embeds.shape=}")
+        if z_input_strategy == 'prompt' and projected_z_conditioning is not None:
+            #if inputs_embeds.shape[1] == 1:
+            #    inputs_embeds = torch.cat((inputs_embeds[:, 0, :].unsqueeze(1), projected_z_conditioning), dim=1)
+            #elif inputs_embeds.shape[1] > 1:
+            #    inputs_embeds = torch.cat((inputs_embeds[:, 0, :].unsqueeze(1), projected_z_conditioning, inputs_embeds[:, 1:, :]), dim=1)
+            #else:
+            #    raise ValueError(f"{inputs_embeds.shape=}")
+            inputs_embeds = torch.cat((projected_z_conditioning, inputs_embeds), dim=1)
 
         hidden_states = inputs_embeds + position_embeds + token_type_embeds
 
@@ -710,6 +713,8 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
         self.init_weights()
+
+        self.plugged_prompt_in = False
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -785,6 +790,9 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         assert kwargs == {}, f"Unexpected keyword arguments: {list(kwargs.keys())}."
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
+        if self.plugged_prompt_in:
+            projected_z_conditioning = None
+
         transformer_outputs = self.transformer(
             input_ids,
             past_key_values=past_key_values,
@@ -803,6 +811,10 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+
+        if projected_z_conditioning is not None and self.plugged_prompt_in is False:
+            self.plugged_prompt_in = True
+
         hidden_states = transformer_outputs[0]
 
         if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'lm_head' in where_to_plug_z:
@@ -823,6 +835,16 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
             return ((loss,) + output) if loss is not None else output
+
+        #if z_input_strategy == 'prompt':
+        #    import ipdb; ipdb.set_trace()
+        #    lm_logits = lm_logits[:, projected_z_conditioning.shape[1]:, :]
+        #    transformer_outputs.past_key_values = tuple([transformer_output_head[:, projected_z_conditioning.shape[1]:, :] for transformer_output_head in transformer_outputs.past_key_values])
+        #    if transformer_outputs.hidden_states is not None:
+        #        transformer_outputs.hidden_states = transformer_outputs.hidden_states[:, projected_z_conditioning.shape[1]:, :]
+
+        #    if transformer_outputs.attentions is not None:
+        #        transformer_outputs.attentions = transformer_outputs.attentions[:, projected_z_conditioning.shape[1]:, :]
 
         return CausalLMOutputWithPast(
             loss=loss,
