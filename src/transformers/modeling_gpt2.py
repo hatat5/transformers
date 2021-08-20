@@ -631,7 +631,12 @@ class GPT2Model(GPT2PreTrainedModel):
             token_type_embeds = 0
 
         if z_input_strategy == 'prompt':
-            inputs_embeds = torch.cat((projected_z_conditioning, inputs_embeds), dim=1)
+            if inputs_embeds.shape[1] == 1:
+                inputs_embeds = torch.cat((inputs_embeds[:, 0, :].unsqueeze(1), projected_z_conditioning), dim=1)
+            elif inputs_embeds.shape[1] > 1:
+                inputs_embeds = torch.cat((inputs_embeds[:, 0, :].unsqueeze(1), projected_z_conditioning, inputs_embeds[:, 1:, :]), dim=1)
+            else:
+                raise ValueError(f"{inputs_embeds.shape=}")
 
         hidden_states = inputs_embeds + position_embeds + token_type_embeds
 
