@@ -508,6 +508,7 @@ class GPT2Model(GPT2PreTrainedModel):
         position_ids=None,
         head_mask=None,
         inputs_embeds=None,
+        z_input_strategy=None,
         projected_z_conditioning=None,
         where_to_plug_z=None,
         encoder_hidden_states=None,
@@ -518,6 +519,14 @@ class GPT2Model(GPT2PreTrainedModel):
         return_dict=None,
         **kwargs,
     ):
+        if z_input_strategy is not None:
+            z_input_strategies = ['prompt', 'inject']
+            if z_input_strategy not in z_input_strategies:
+                raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
+
+        if position_ids is not None and token_type_ids is not None and z_input_strategy == 'prompt':
+            raise ValueError('To run prompting, we need position ids and token type ids to be None')
+
         if "past" in kwargs:
             warnings.warn(
                 "The `past` argument is deprecated and will be removed in a future version, use `past_key_values` instead.",
@@ -555,6 +564,21 @@ class GPT2Model(GPT2PreTrainedModel):
             past_key_values = [None] * len(self.h)
         else:
             past_length = past_key_values[0][0].size(-2)
+
+        if z_input_strategy == 'prompt':
+            new_input_shape = []
+            for i in range(len(input_shape)-1):
+                new_input_shape.append(input_shape[i])
+            new_input_shape.append(input_shape[-1] + projected_z_conditioning.shape[1])
+            input_shape = torch.Size(new_input_shape)
+
+            prompt_attention_mask_input = torch.ones(projected_z_conditioning.shape[0], projected_z_conditioning.shape[1])
+            if attention_mask is not None:
+                attention_mask = torch.cat((prompt_attention_mask_input, attention_mask), dim=1)
+            #else:
+            #    import ipdb; ipdb.set_trace()
+            #    attention_mask = prompt_attention_mask_input
+
         if position_ids is None:
             device = input_ids.device if input_ids is not None else inputs_embeds.device
             position_ids = torch.arange(past_length, input_shape[-1] + past_length, dtype=torch.long, device=device)
@@ -578,6 +602,8 @@ class GPT2Model(GPT2PreTrainedModel):
             # effectively the same as removing these entirely.
             attention_mask = attention_mask.to(dtype=next(self.parameters()).dtype)  # fp16 compatibility
             attention_mask = (1.0 - attention_mask) * torch.finfo(attention_mask.dtype).min
+
+            #TODO: Might have to update attention mask
 
         # If a 2D ou 3D attention mask is provided for the cross-attention
         # we need to make broadcastabe to [batch_size, num_heads, seq_length, seq_length]
@@ -603,10 +629,14 @@ class GPT2Model(GPT2PreTrainedModel):
             token_type_embeds = self.wte(token_type_ids)
         else:
             token_type_embeds = 0
+
+        if z_input_strategy == 'prompt':
+            inputs_embeds = torch.cat((projected_z_conditioning, inputs_embeds), dim=1)
+
         hidden_states = inputs_embeds + position_embeds + token_type_embeds
 
 
-        if projected_z_conditioning is not None and 'embedding' in where_to_plug_z:
+        if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'embedding' in where_to_plug_z:
             hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
                                                            projected_z_conditioning=projected_z_conditioning)
 
@@ -639,7 +669,7 @@ class GPT2Model(GPT2PreTrainedModel):
             if output_attentions:
                 all_attentions = all_attentions + (outputs[2],)
 
-            if projected_z_conditioning is not None and 'every_layer' in where_to_plug_z:
+            if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'every_layer' in where_to_plug_z:
                 hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
                                                                projected_z_conditioning=projected_z_conditioning)
 
@@ -688,6 +718,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             "input_ids": input_ids,
             "past_key_values": past,
             "use_cache": kwargs.get("use_cache"),
+            "z_input_strategy": kwargs["z_input_strategy"],
             "projected_z_conditioning": kwargs["projected_z_conditioning"],
             "where_to_plug_z": kwargs["where_to_plug_z"],
         }
@@ -717,6 +748,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         encoder_hidden_states=None,
         encoder_attention_mask=None,
         labels=None,
+        z_input_strategy=None,
         projected_z_conditioning=None,
         where_to_plug_z=None,
         use_cache=None,
@@ -733,6 +765,12 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             All labels set to ``-100`` are ignored (masked), the loss is only
             computed for labels in ``[0, ..., config.vocab_size]``
         """
+
+        if z_input_strategy is not None:
+            z_input_strategies = ['prompt', 'inject']
+            if z_input_strategy not in z_input_strategies:
+                raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
+
         if "past" in kwargs:
             warnings.warn(
                 "The `past` argument is deprecated and will be removed in a future version, use `past_key_values` instead.",
@@ -753,6 +791,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
             use_cache=use_cache,
+            z_input_strategy=z_input_strategy,
             projected_z_conditioning=projected_z_conditioning,
             where_to_plug_z=where_to_plug_z,
             output_attentions=output_attentions,
@@ -761,7 +800,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         )
         hidden_states = transformer_outputs[0]
 
-        if 'lm_head' in where_to_plug_z:
+        if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'lm_head' in where_to_plug_z:
             hidden_states = hidden_states + self.transformer.process_z(hidden_states=hidden_states,
                                                                        projected_z_conditioning=projected_z_conditioning)
 
