@@ -812,7 +812,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             return_dict=return_dict,
         )
 
-        if projected_z_conditioning is not None and self.plugged_prompt_in is False:
+        if projected_z_conditioning is not None and self.plugged_prompt_in is False and z_input_strategy == 'prompt':
             self.plugged_prompt_in = True
 
         hidden_states = transformer_outputs[0]
