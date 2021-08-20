@@ -570,9 +570,9 @@ class GPT2Model(GPT2PreTrainedModel):
             for i in range(len(input_shape)-1):
                 new_input_shape.append(input_shape[i])
             new_input_shape.append(input_shape[-1] + projected_z_conditioning.shape[1])
-            input_shape = torch.Size(new_input_shape)
+            input_shape = torch.Size(new_input_shape).to(input_ids.device)
 
-            prompt_attention_mask_input = torch.ones(projected_z_conditioning.shape[0], projected_z_conditioning.shape[1])
+            prompt_attention_mask_input = torch.ones(projected_z_conditioning.shape[0], projected_z_conditioning.shape[1], device=input_ids.device)
             if attention_mask is not None:
                 attention_mask = torch.cat((prompt_attention_mask_input, attention_mask), dim=1)
             #else:
