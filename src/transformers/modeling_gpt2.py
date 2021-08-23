@@ -681,7 +681,7 @@ class GPT2Model(GPT2PreTrainedModel):
                 hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
                                                                projected_z_conditioning=projected_z_conditioning)
 
-            if i == self.n_head-1 or i == self.n_head-2:
+            if i == self.config.n_head-1 or i == self.config.n_head-2:
                 if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'last_2_layers' in where_to_plug_z:
                     hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
                                                                    projected_z_conditioning=projected_z_conditioning)
