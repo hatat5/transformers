@@ -282,6 +282,7 @@ class Block(nn.Module):
         projected_z_conditioning=None,
         where_to_plug_z=None,
         layer_number=1,
+        total_num_layers=12,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
         use_cache=False,
@@ -300,14 +301,16 @@ class Block(nn.Module):
         # residual connection
         hidden_states = attn_output + hidden_states
 
-        if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'every_layer_self_attn' in where_to_plug_z:
-            hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                           projected_z_conditioning=projected_z_conditioning)
-
-        if layer_number == self.config.n_layer - 1 or layer_number == self.config.n_layer - 2:
-            if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'last_2_layers_self_attn' in where_to_plug_z:
+        if z_input_strategy == 'inject' and projected_z_conditioning is not None:
+            if 'every_layer_self_attn' in where_to_plug_z:
                 hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
                                                                projected_z_conditioning=projected_z_conditioning)
+            elif 'last_2_layers_self_attn' in where_to_plug_z and \
+                    (layer_number == total_num_layers - 1 or layer_number == total_num_layers - 2):
+                hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
+                                                               projected_z_conditioning=projected_z_conditioning)
+            else:
+                pass
 
         if encoder_hidden_states is not None:
             # add one self-attention block for cross-attention
@@ -681,6 +684,7 @@ class GPT2Model(GPT2PreTrainedModel):
                 projected_z_conditioning=projected_z_conditioning,
                 where_to_plug_z=where_to_plug_z,
                 layer_number=i,
+                total_num_layers=self.config.n_layer,
                 encoder_hidden_states=encoder_hidden_states,
                 encoder_attention_mask=encoder_attention_mask,
                 use_cache=use_cache,
