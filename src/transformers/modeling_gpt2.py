@@ -272,6 +272,12 @@ class Block(nn.Module):
             self.ln_cross_attn = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
         self.mlp = MLP(inner_dim, config)
 
+    @staticmethod
+    def process_z(hidden_states, projected_z_conditioning):
+        seqlen = hidden_states.size(1)
+        reshaped_projected_z_conditioning = projected_z_conditioning.repeat(1, seqlen, 1).requires_grad_(True)
+        return reshaped_projected_z_conditioning
+
     def forward(
         self,
         hidden_states,
