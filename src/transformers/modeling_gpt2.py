@@ -315,7 +315,7 @@ class Block(nn.Module):
         # residual connection
         hidden_states = attn_output + hidden_states
 
-        if z_input_strategy == 'inject' and projected_z_conditioning is not None:
+        if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None:
             if 'every_layer_self_attn' in where_to_plug_z:
                 hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
                                                                projected_z_conditioning=projected_z_conditioning,
