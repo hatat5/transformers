@@ -518,6 +518,7 @@ class GPT2Model(GPT2PreTrainedModel):
         if z_input_strategy in ['inject', 'prompt']:
             reshaped_projected_z_conditioning = projected_z_conditioning.repeat(1, seqlen, 1).requires_grad_(True)
         elif z_input_strategy == 'inject_first':
+            import ipdb; ipdb.set_trace()
             zero_pad = torch.zeros_like(projected_z_conditioning, requires_grad=True).repeat(1, seqlen-1, 1)
             reshaped_projected_z_conditioning = torch.cat((projected_z_conditioning, zero_pad), dim=1)
         else:
