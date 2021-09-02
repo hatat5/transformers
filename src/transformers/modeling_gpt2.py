@@ -518,7 +518,6 @@ class GPT2Model(GPT2PreTrainedModel):
         if z_input_strategy in ['inject', 'prompt']:
             reshaped_projected_z_conditioning = projected_z_conditioning.repeat(1, seqlen, 1).requires_grad_(True)
         elif z_input_strategy == 'inject_first':
-            import ipdb; ipdb.set_trace()
             zero_pad = torch.zeros_like(projected_z_conditioning, requires_grad=True).repeat(1, seqlen-1, 1)
             reshaped_projected_z_conditioning = torch.cat((projected_z_conditioning, zero_pad), dim=1)
         else:
@@ -678,8 +677,7 @@ class GPT2Model(GPT2PreTrainedModel):
 
         hidden_states = inputs_embeds + position_embeds + token_type_embeds
 
-
-        if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'embedding' in where_to_plug_z:
+        if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None and 'embedding' in where_to_plug_z:
             hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
                                                            projected_z_conditioning=projected_z_conditioning,
                                                            z_input_strategy=z_input_strategy)
@@ -719,7 +717,7 @@ class GPT2Model(GPT2PreTrainedModel):
             if output_attentions:
                 all_attentions = all_attentions + (outputs[2],)
 
-            if z_input_strategy == 'inject' and projected_z_conditioning is not None:
+            if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None:
                 if 'every_layer' in where_to_plug_z:
                     hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
                                                                    projected_z_conditioning=projected_z_conditioning,
@@ -873,7 +871,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
 
         hidden_states = transformer_outputs[0]
 
-        if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'lm_head' in where_to_plug_z:
+        if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None and 'lm_head' in where_to_plug_z:
             hidden_states = hidden_states + self.transformer.process_z(hidden_states=hidden_states,
                                                                        projected_z_conditioning=projected_z_conditioning,
                                                                        z_input_strategy=z_input_strategy)
