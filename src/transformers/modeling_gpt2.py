@@ -513,9 +513,16 @@ class GPT2Model(GPT2PreTrainedModel):
         for layer, heads in heads_to_prune.items():
             self.h[layer].attn.prune_heads(heads)
 
-    def process_z(self, hidden_states, projected_z_conditioning):
+    def process_z(self, hidden_states, projected_z_conditioning, z_input_strategy: str = 'inject'):
         seqlen = hidden_states.size(1)
-        reshaped_projected_z_conditioning = projected_z_conditioning.repeat(1, seqlen, 1).requires_grad_(True)
+        if z_input_strategy in ['inject', 'prompt']:
+            reshaped_projected_z_conditioning = projected_z_conditioning.repeat(1, seqlen, 1).requires_grad_(True)
+        elif z_input_strategy == 'inject_first':
+            zero_pad = torch.zeros_like(projected_z_conditioning).repeat(1, seqlen-1, 1)
+            reshaped_projected_z_conditioning = torch.cat((projected_z_conditioning, zero_pad), dim=1)
+        else:
+            raise ValueError('z_input_strategy needs to be inject, prompt or inject_first')
+
         return reshaped_projected_z_conditioning
 
     @add_start_docstrings_to_callable(GPT2_INPUTS_DOCSTRING)
@@ -547,7 +554,7 @@ class GPT2Model(GPT2PreTrainedModel):
         **kwargs,
     ):
         if z_input_strategy is not None:
-            z_input_strategies = ['prompt', 'inject']
+            z_input_strategies = ['prompt', 'inject', 'inject_first']
             if z_input_strategy not in z_input_strategies:
                 raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
 
@@ -673,7 +680,8 @@ class GPT2Model(GPT2PreTrainedModel):
 
         if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'embedding' in where_to_plug_z:
             hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                           projected_z_conditioning=projected_z_conditioning)
+                                                           projected_z_conditioning=projected_z_conditioning,
+                                                           z_input_strategy=z_input_strategy)
 
         hidden_states = self.drop(hidden_states)
 
@@ -713,13 +721,16 @@ class GPT2Model(GPT2PreTrainedModel):
             if z_input_strategy == 'inject' and projected_z_conditioning is not None:
                 if 'every_layer' in where_to_plug_z:
                     hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                                   projected_z_conditioning=projected_z_conditioning)
+                                                                   projected_z_conditioning=projected_z_conditioning,
+                                                                   z_input_strategy=z_input_strategy)
                 elif 'last_2_layers' in where_to_plug_z and (i == self.config.n_layer - 1 or i == self.config.n_layer - 2):
                     hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                                   projected_z_conditioning=projected_z_conditioning)
+                                                                   projected_z_conditioning=projected_z_conditioning,
+                                                                   z_input_strategy=z_input_strategy)
                 elif i in layers_to_inject and 'feedforward' in where_to_plug_z:
                     hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                                   projected_z_conditioning=projected_z_conditioning)
+                                                                   projected_z_conditioning=projected_z_conditioning,
+                                                                   z_input_strategy=z_input_strategy)
 
         hidden_states = self.ln_f(hidden_states)
 
@@ -819,7 +830,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         """
 
         if z_input_strategy is not None:
-            z_input_strategies = ['prompt', 'inject']
+            z_input_strategies = ['prompt', 'inject', 'inject_first']
             if z_input_strategy not in z_input_strategies:
                 raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
 
@@ -862,7 +873,8 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
 
         if z_input_strategy == 'inject' and projected_z_conditioning is not None and 'lm_head' in where_to_plug_z:
             hidden_states = hidden_states + self.transformer.process_z(hidden_states=hidden_states,
-                                                                       projected_z_conditioning=projected_z_conditioning)
+                                                                       projected_z_conditioning=projected_z_conditioning,
+                                                                       z_input_strategy=z_input_strategy)
 
         lm_logits = self.lm_head(hidden_states)
 
