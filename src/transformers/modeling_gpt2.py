@@ -41,6 +41,7 @@ from .modeling_utils import (
     SequenceSummary,
     find_pruneable_heads_and_indices,
     prune_conv1d_layer,
+    process_z,
 )
 from .utils import logging
 
@@ -272,19 +273,6 @@ class Block(nn.Module):
             self.ln_cross_attn = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
         self.mlp = MLP(inner_dim, config)
 
-    @staticmethod
-    def process_z(hidden_states, projected_z_conditioning, z_input_strategy: str = 'inject'):
-        seqlen = hidden_states.size(1)
-        if z_input_strategy in ['inject', 'prompt']:
-            reshaped_projected_z_conditioning = projected_z_conditioning.repeat(1, seqlen, 1).requires_grad_(True)
-        elif z_input_strategy == 'inject_first':
-            zero_pad = torch.zeros_like(projected_z_conditioning, requires_grad=True).repeat(1, seqlen-1, 1)
-            reshaped_projected_z_conditioning = torch.cat((projected_z_conditioning, zero_pad), dim=1)
-        else:
-            raise ValueError('z_input_strategy needs to be inject, prompt or inject_first')
-
-        return reshaped_projected_z_conditioning
-
     def forward(
         self,
         hidden_states,
@@ -317,18 +305,18 @@ class Block(nn.Module):
 
         if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None:
             if 'every_layer_self_attn' in where_to_plug_z:
-                hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                               projected_z_conditioning=projected_z_conditioning,
-                                                               z_input_strategy=z_input_strategy)
+                hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                          projected_z_conditioning=projected_z_conditioning,
+                                                          z_input_strategy=z_input_strategy)
             elif 'last_2_layers_self_attn' in where_to_plug_z and \
                     (layer_number == total_num_layers - 1 or layer_number == total_num_layers - 2):
-                hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                               projected_z_conditioning=projected_z_conditioning,
-                                                               z_input_strategy=z_input_strategy)
+                hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                          projected_z_conditioning=projected_z_conditioning,
+                                                          z_input_strategy=z_input_strategy)
             elif layer_number in layers_to_inject and 'self_attn' in where_to_plug_z:
-                hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                               projected_z_conditioning=projected_z_conditioning,
-                                                               z_input_strategy=z_input_strategy)
+                hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                          projected_z_conditioning=projected_z_conditioning,
+                                                          z_input_strategy=z_input_strategy)
             else:
                 pass
 
@@ -523,19 +511,6 @@ class GPT2Model(GPT2PreTrainedModel):
         for layer, heads in heads_to_prune.items():
             self.h[layer].attn.prune_heads(heads)
 
-    @staticmethod
-    def process_z(hidden_states, projected_z_conditioning, z_input_strategy: str = 'inject'):
-        seqlen = hidden_states.size(1)
-        if z_input_strategy in ['inject', 'prompt']:
-            reshaped_projected_z_conditioning = projected_z_conditioning.repeat(1, seqlen, 1).requires_grad_(True)
-        elif z_input_strategy == 'inject_first':
-            zero_pad = torch.zeros_like(projected_z_conditioning, requires_grad=True).repeat(1, seqlen-1, 1)
-            reshaped_projected_z_conditioning = torch.cat((projected_z_conditioning, zero_pad), dim=1)
-        else:
-            raise ValueError('z_input_strategy needs to be inject, prompt or inject_first')
-
-        return reshaped_projected_z_conditioning
-
     @add_start_docstrings_to_callable(GPT2_INPUTS_DOCSTRING)
     @add_code_sample_docstrings(
         tokenizer_class=_TOKENIZER_FOR_DOC,
@@ -689,9 +664,9 @@ class GPT2Model(GPT2PreTrainedModel):
         hidden_states = inputs_embeds + position_embeds + token_type_embeds
 
         if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None and 'embedding' in where_to_plug_z:
-            hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                           projected_z_conditioning=projected_z_conditioning,
-                                                           z_input_strategy=z_input_strategy)
+            hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                      projected_z_conditioning=projected_z_conditioning,
+                                                      z_input_strategy=z_input_strategy)
 
         hidden_states = self.drop(hidden_states)
 
@@ -730,17 +705,17 @@ class GPT2Model(GPT2PreTrainedModel):
 
             if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None:
                 if 'every_layer' in where_to_plug_z:
-                    hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                                   projected_z_conditioning=projected_z_conditioning,
-                                                                   z_input_strategy=z_input_strategy)
+                    hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                              projected_z_conditioning=projected_z_conditioning,
+                                                              z_input_strategy=z_input_strategy)
                 elif 'last_2_layers' in where_to_plug_z and (i == self.config.n_layer - 1 or i == self.config.n_layer - 2):
-                    hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                                   projected_z_conditioning=projected_z_conditioning,
-                                                                   z_input_strategy=z_input_strategy)
+                    hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                              projected_z_conditioning=projected_z_conditioning,
+                                                              z_input_strategy=z_input_strategy)
                 elif i in layers_to_inject and 'feedforward' in where_to_plug_z:
-                    hidden_states = hidden_states + self.process_z(hidden_states=hidden_states,
-                                                                   projected_z_conditioning=projected_z_conditioning,
-                                                                   z_input_strategy=z_input_strategy)
+                    hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                              projected_z_conditioning=projected_z_conditioning,
+                                                              z_input_strategy=z_input_strategy)
 
         hidden_states = self.ln_f(hidden_states)
 
