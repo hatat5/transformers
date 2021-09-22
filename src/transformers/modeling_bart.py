@@ -41,7 +41,7 @@ from .modeling_outputs import (
     Seq2SeqQuestionAnsweringModelOutput,
     Seq2SeqSequenceClassifierOutput,
 )
-from .modeling_utils import PreTrainedModel
+from .modeling_utils import PreTrainedModel, process_z
 from .utils import logging
 
 
@@ -503,6 +503,10 @@ class BartDecoder(nn.Module):
         decoder_padding_mask,
         decoder_causal_mask,
         past_key_values=None,
+        z_input_strategy=None,
+        projected_z_conditioning=None,
+        where_to_plug_z=None,
+        layers_to_inject=[],
         use_cache=False,
         output_attentions=False,
         output_hidden_states=False,
@@ -528,6 +532,11 @@ class BartDecoder(nn.Module):
                 - hidden states
                 - attentions
         """
+        if z_input_strategy is not None:
+            z_input_strategies = ['prompt', 'inject', 'inject_first']
+            if z_input_strategy not in z_input_strategies:
+                raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
+
         if "decoder_cached_states" in unused:
             warnings.warn(
                 "The `decoder_cached_states` argument is deprecated and will be removed in a future version, use `past_key_values` instead.",
@@ -562,6 +571,11 @@ class BartDecoder(nn.Module):
         x = x.transpose(0, 1)
         encoder_hidden_states = encoder_hidden_states.transpose(0, 1)
 
+        if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None and 'embedding' in where_to_plug_z:
+            x = x + process_z(hidden_states=x,
+                              projected_z_conditioning=projected_z_conditioning,
+                              z_input_strategy=z_input_strategy)
+
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
@@ -585,6 +599,21 @@ class BartDecoder(nn.Module):
                 causal_mask=decoder_causal_mask,
                 output_attentions=output_attentions,
             )
+
+            if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None:
+                if 'every_layer' in where_to_plug_z:
+                    x = x + process_z(hidden_states=x,
+                                      projected_z_conditioning=projected_z_conditioning,
+                                      z_input_strategy=z_input_strategy)
+                elif 'last_2_layers' in where_to_plug_z and (
+                        idx == len(self.layers) - 1 or idx == len(self.layers) - 2):
+                    x = x + process_z(hidden_states=x,
+                                      projected_z_conditioning=projected_z_conditioning,
+                                      z_input_strategy=z_input_strategy)
+                elif idx in layers_to_inject and 'feedforward' in where_to_plug_z:
+                    x = x + process_z(hidden_states=x,
+                                      projected_z_conditioning=projected_z_conditioning,
+                                      z_input_strategy=z_input_strategy)
 
             if use_cache:
                 next_decoder_cache.append(layer_past.copy())
@@ -873,12 +902,21 @@ class BartModel(PretrainedBartModel):
         encoder_outputs: Optional[Tuple] = None,
         decoder_attention_mask=None,
         past_key_values=None,
+        z_input_strategy=None,
+        projected_z_conditioning=None,
+        where_to_plug_z=None,
+        layers_to_inject=[],
         use_cache=None,
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
         **kwargs,
     ):
+        if z_input_strategy is not None:
+            z_input_strategies = ['prompt', 'inject', 'inject_first']
+            if z_input_strategy not in z_input_strategies:
+                raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
+
         if "decoder_past_key_values" in kwargs:
             warnings.warn(
                 "The `decoder_past_key_values` argument is deprecated and will be removed in a future version, use `past_key_values` instead.",
@@ -895,6 +933,10 @@ class BartModel(PretrainedBartModel):
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if z_input_strategy == 'prompt' and projected_z_conditioning is not None:
+            encoder_outputs = tuple([projected_z_conditioning[i] for i in range(projected_z_conditioning.size(1))])
+            raise NotImplementedError('not implemented')
 
         # make masks if user doesn't supply
         if not use_cache:
@@ -934,6 +976,10 @@ class BartModel(PretrainedBartModel):
             decoder_padding_mask,
             decoder_causal_mask=causal_mask,
             past_key_values=past_key_values,
+            z_input_strategy=z_input_strategy,
+            projected_z_conditioning=projected_z_conditioning,
+            where_to_plug_z=where_to_plug_z,
+            layers_to_inject=layers_to_inject,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
@@ -978,6 +1024,8 @@ class BartForConditionalGeneration(PretrainedBartModel):
         self.model = base_model
         self.register_buffer("final_logits_bias", torch.zeros((1, self.model.shared.num_embeddings)))
 
+        self.plugged_prompt_in = False
+
     def resize_token_embeddings(self, new_num_tokens: int) -> nn.Embedding:
         old_num_tokens = self.model.shared.num_embeddings
         new_embeddings = super().resize_token_embeddings(new_num_tokens)
@@ -1005,6 +1053,10 @@ class BartForConditionalGeneration(PretrainedBartModel):
         decoder_attention_mask=None,
         past_key_values=None,
         labels=None,
+        z_input_strategy=None,
+        projected_z_conditioning=None,
+        where_to_plug_z=None,
+        layers_to_inject=[],
         use_cache=None,
         output_attentions=None,
         output_hidden_states=None,
@@ -1038,6 +1090,11 @@ class BartForConditionalGeneration(PretrainedBartModel):
                 tokenizer.decode(predictions).split()
                 # ['good', 'great', 'all', 'really', 'very']
         """
+        if z_input_strategy is not None:
+            z_input_strategies = ['prompt', 'inject', 'inject_first']
+            if z_input_strategy not in z_input_strategies:
+                raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
+
         if "lm_labels" in unused:
             warnings.warn(
                 "The `lm_labels` argument is deprecated and will be removed in a future version, use `labels` instead.",
@@ -1063,6 +1120,9 @@ class BartForConditionalGeneration(PretrainedBartModel):
             if decoder_input_ids is None:
                 decoder_input_ids = shift_tokens_right(labels, self.config.pad_token_id)
 
+        if self.plugged_prompt_in:
+            projected_z_conditioning = None
+
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
@@ -1071,6 +1131,10 @@ class BartForConditionalGeneration(PretrainedBartModel):
             decoder_attention_mask=decoder_attention_mask,
             past_key_values=past_key_values,
             use_cache=use_cache,
+            z_input_strategy=z_input_strategy,
+            projected_z_conditioning=projected_z_conditioning,
+            where_to_plug_z=where_to_plug_z,
+            layers_to_inject=layers_to_inject,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -1108,6 +1172,10 @@ class BartForConditionalGeneration(PretrainedBartModel):
             "decoder_input_ids": decoder_input_ids,
             "attention_mask": attention_mask,
             "use_cache": use_cache,  # change this to avoid caching (presumably for debugging)
+            "z_input_strategy": kwargs["z_input_strategy"],
+            "projected_z_conditioning": kwargs["projected_z_conditioning"],
+            "where_to_plug_z": kwargs["where_to_plug_z"],
+            "layers_to_inject": kwargs["layers_to_inject"],
         }
 
     def adjust_logits_during_generation(self, logits, cur_len, max_length):
