@@ -2345,3 +2345,16 @@ def apply_chunking_to_forward(
         return torch.cat(output_chunks, dim=chunk_dim)
 
     return forward_fn(*input_tensors)
+
+def process_z(hidden_states: torch.Tensor, projected_z: torch.Tensor, z_input_strategy: str = 'inject') -> torch.Tensor:
+    seqlen = hidden_states.size(1)
+
+    if z_input_strategy in ['inject', 'prompt']:
+        reshaped_projected_z = projected_z.repeat(1, seqlen, 1).requires_grad_(True)
+    elif z_input_strategy == 'inject_first':
+        zero_pad = torch.zeros_like(projected_z, requires_grad=True).repeat(1, seqlen - 1, 1)
+        reshaped_projected_z = torch.cat((projected_z, zero_pad), dim=1)
+    else:
+        raise ValueError('z_input_strategy needs to be inject, prompt, or inject_first')
+
+    return reshaped_projected_z

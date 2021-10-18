@@ -41,7 +41,7 @@ from ...modeling_outputs import (
     Seq2SeqQuestionAnsweringModelOutput,
     Seq2SeqSequenceClassifierOutput,
 )
-from ...modeling_utils import PreTrainedModel
+from ...modeling_utils import PreTrainedModel, process_z
 from ...utils import logging
 from .configuration_bart import BartConfig
 
@@ -890,6 +890,10 @@ class BartDecoder(BartPretrainedModel):
         head_mask=None,
         cross_attn_head_mask=None,
         past_key_values=None,
+        z_input_strategy=None,
+        projected_z=None,
+        where_to_plug_z=None,
+        layers_to_inject=[],
         inputs_embeds=None,
         use_cache=None,
         output_attentions=None,
@@ -964,6 +968,11 @@ class BartDecoder(BartPretrainedModel):
             return_dict (:obj:`bool`, `optional`):
                 Whether or not to return a :class:`~transformers.file_utils.ModelOutput` instead of a plain tuple.
         """
+        if z_input_strategy is not None:
+            z_input_strategies = ['prompt', 'inject', 'inject_first']
+            if z_input_strategy not in z_input_strategies:
+                raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1004,6 +1013,11 @@ class BartDecoder(BartPretrainedModel):
         hidden_states = self.layernorm_embedding(hidden_states)
 
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+
+        if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None and 'embedding' in where_to_plug_z:
+            x = x + process_z(hidden_states=x,
+                              projected_z=projected_z,
+                              z_input_strategy=z_input_strategy)
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
@@ -1068,6 +1082,21 @@ class BartDecoder(BartPretrainedModel):
                     use_cache=use_cache,
                 )
             hidden_states = layer_outputs[0]
+
+            if z_input_strategy in ['inject', 'inject_first'] and projected_z is not None:
+                if 'every_layer' in where_to_plug_z:
+                    hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                              projected_z=projected_z,
+                                                              z_input_strategy=z_input_strategy)
+                elif 'last_2_layers' in where_to_plug_z and (
+                        idx == len(self.layers) - 1 or idx == len(self.layers) - 2):
+                    hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                              projected_z=projected_z,
+                                                              z_input_strategy=z_input_strategy)
+                elif idx in layers_to_inject and 'feedforward' in where_to_plug_z:
+                    hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                              projected_z=projected_z,
+                                                              z_input_strategy=z_input_strategy)
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[3 if output_attentions else 1],)
@@ -1146,6 +1175,10 @@ class BartModel(BartPretrainedModel):
         cross_attn_head_mask=None,
         encoder_outputs=None,
         past_key_values=None,
+        z_input_strategy=None,
+        projected_z=None,
+        where_to_plug_z=None,
+        layers_to_inject=[],
         inputs_embeds=None,
         decoder_inputs_embeds=None,
         use_cache=None,
@@ -1153,6 +1186,15 @@ class BartModel(BartPretrainedModel):
         output_hidden_states=None,
         return_dict=None,
     ):
+        if z_input_strategy is not None:
+            z_input_strategies = ['prompt', 'inject', 'inject_first']
+            if z_input_strategy not in z_input_strategies:
+                raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
+
+        if z_input_strategy == 'prompt' and projected_z_conditioning is not None:
+            encoder_outputs = tuple([projected_z[i] for i in range(projected_z.size(1))])
+            raise NotImplementedError('not implemented')
+
 
         # different to other models, Bart automatically creates decoder_input_ids from
         # input_ids if no decoder_input_ids are provided
@@ -1195,6 +1237,10 @@ class BartModel(BartPretrainedModel):
             head_mask=decoder_head_mask,
             cross_attn_head_mask=cross_attn_head_mask,
             past_key_values=past_key_values,
+            z_input_strategy=z_input_strategy,
+            projected_z=projected_z,
+            where_to_plug_z=where_to_plug_z,
+            layers_to_inject=layers_to_inject,
             inputs_embeds=decoder_inputs_embeds,
             use_cache=use_cache,
             output_attentions=output_attentions,
@@ -1231,6 +1277,8 @@ class BartForConditionalGeneration(BartPretrainedModel):
         self.lm_head = nn.Linear(config.d_model, self.model.shared.num_embeddings, bias=False)
 
         self.init_weights()
+
+        self.plugged_prompt_in = False
 
     def get_encoder(self):
         return self.model.get_encoder()
@@ -1272,6 +1320,10 @@ class BartForConditionalGeneration(BartPretrainedModel):
         cross_attn_head_mask=None,
         encoder_outputs=None,
         past_key_values=None,
+        z_input_strategy=None,
+        projected_z=None,
+        where_to_plug_z=None,
+        layers_to_inject=[],
         inputs_embeds=None,
         decoder_inputs_embeds=None,
         labels=None,
@@ -1288,6 +1340,14 @@ class BartForConditionalGeneration(BartPretrainedModel):
 
         Returns:
         """
+        if z_input_strategy is not None:
+            z_input_strategies = ['prompt', 'inject', 'inject_first']
+            if z_input_strategy not in z_input_strategies:
+                raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
+
+        if self.plugged_prompt_in:
+            projected_z = None
+
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         if labels is not None:
@@ -1306,6 +1366,10 @@ class BartForConditionalGeneration(BartPretrainedModel):
             decoder_head_mask=decoder_head_mask,
             cross_attn_head_mask=cross_attn_head_mask,
             past_key_values=past_key_values,
+            z_input_strategy=z_input_strategy,
+            projected_z=projected_z,
+            where_to_plug_z=where_to_plug_z,
+            layers_to_inject=layers_to_inject,
             inputs_embeds=inputs_embeds,
             decoder_inputs_embeds=decoder_inputs_embeds,
             use_cache=use_cache,
@@ -1362,6 +1426,10 @@ class BartForConditionalGeneration(BartPretrainedModel):
             "decoder_head_mask": decoder_head_mask,
             "cross_attn_head_mask": cross_attn_head_mask,
             "use_cache": use_cache,  # change this to avoid caching (presumably for debugging)
+            "z_input_strategy": kwargs["z_input_strategy"],
+            "projected_z": kwargs["projected_z"],
+            "where_to_plug_z": kwargs["where_to_plug_z"],
+            "layers_to_inject": kwargs["layers_to_inject"],
         }
 
     def prepare_decoder_input_ids_from_labels(self, labels: torch.Tensor):
