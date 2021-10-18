@@ -1015,9 +1015,9 @@ class BartDecoder(BartPretrainedModel):
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
 
         if z_input_strategy in ['inject', 'inject_first'] and projected_z is not None and 'embedding' in where_to_plug_z:
-            x = x + process_z(hidden_states=x,
-                              projected_z=projected_z,
-                              z_input_strategy=z_input_strategy)
+            hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                      projected_z=projected_z,
+                                                      z_input_strategy=z_input_strategy)
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
