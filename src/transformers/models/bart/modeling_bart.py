@@ -1014,7 +1014,7 @@ class BartDecoder(BartPretrainedModel):
 
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
 
-        if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None and 'embedding' in where_to_plug_z:
+        if z_input_strategy in ['inject', 'inject_first'] and projected_z is not None and 'embedding' in where_to_plug_z:
             x = x + process_z(hidden_states=x,
                               projected_z=projected_z,
                               z_input_strategy=z_input_strategy)
@@ -1191,7 +1191,7 @@ class BartModel(BartPretrainedModel):
             if z_input_strategy not in z_input_strategies:
                 raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
 
-        if z_input_strategy == 'prompt' and projected_z_conditioning is not None:
+        if z_input_strategy == 'prompt' and projected_z is not None:
             encoder_outputs = tuple([projected_z[i] for i in range(projected_z.size(1))])
             raise NotImplementedError('not implemented')
 
