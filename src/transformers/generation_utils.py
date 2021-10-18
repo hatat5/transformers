@@ -411,7 +411,7 @@ class GenerationMixin:
             encoder_kwargs = {
                 argument: value
                 for argument, value in model_kwargs.items()
-                if not (argument.startswith("decoder_") or argument.startswith("cross_attn"))
+                if not (argument.startswith("decoder_") or argument.startswith("cross_attn") or argument.startswith("where_to_plug_z") or argument.startswith("layers_to_inject") or argument.startswith("z_input_strategy") or argument.startswith("projected_z"))
             }
             model_kwargs["encoder_outputs"]: ModelOutput = encoder(input_ids, return_dict=True, **encoder_kwargs)
         return model_kwargs
