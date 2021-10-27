@@ -925,7 +925,7 @@ class GPT2Model(GPT2PreTrainedModel):
                     hidden_states = hidden_states + process_z(hidden_states=hidden_states,
                                                               projected_z=projected_z,
                                                               z_input_strategy=z_input_strategy)
-                elif idx in layers_to_inject and 'feedforward' in where_to_plug_z:
+                elif i in layers_to_inject and 'feedforward' in where_to_plug_z:
                     hidden_states = hidden_states + process_z(hidden_states=hidden_states,
                                                               projected_z=projected_z,
                                                               z_input_strategy=z_input_strategy)
