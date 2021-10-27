@@ -1379,6 +1379,10 @@ class BartForConditionalGeneration(BartPretrainedModel):
         )
         lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
 
+        if projected_z is not None and self.plugged_prompt_in is False:
+            if z_input_strategy == 'prompt' or z_input_strategy == 'inject_first':
+                self.plugged_prompt_in = True
+
         masked_lm_loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()

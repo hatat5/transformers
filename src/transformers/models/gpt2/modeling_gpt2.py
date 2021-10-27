@@ -1114,6 +1114,10 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         )
         hidden_states = transformer_outputs[0]
 
+        if projected_z is not None and self.plugged_prompt_in is False:
+            if z_input_strategy == 'prompt' or z_input_strategy == 'inject_first':
+                self.plugged_prompt_in = True
+
         # Set device for model parallelism
         if self.model_parallel:
             torch.cuda.set_device(self.transformer.first_device)
