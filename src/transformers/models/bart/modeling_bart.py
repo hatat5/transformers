@@ -19,6 +19,8 @@ import random
 import warnings
 from typing import Optional, Tuple
 
+from argparse import Namespace
+
 import torch
 import torch.utils.checkpoint
 from torch import nn
@@ -1258,6 +1260,10 @@ class BartModel(BartPretrainedModel):
 
         if not return_dict:
             return decoder_outputs + encoder_outputs
+
+        if encoder_outputs[0] is None:
+            encoder_outputs = Namespace(last_hidden_state=None, hidden_states=None, attentions=None)
+        
 
         return Seq2SeqModelOutput(
             last_hidden_state=decoder_outputs.last_hidden_state,
