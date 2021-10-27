@@ -53,6 +53,7 @@ from ...modeling_utils import (
     SequenceSummary,
     find_pruneable_heads_and_indices,
     prune_conv1d_layer,
+    process_z,
 )
 from ...utils import logging
 from ...utils.model_parallel_utils import assert_device_map, get_device_map
@@ -745,6 +746,10 @@ class GPT2Model(GPT2PreTrainedModel):
         token_type_ids=None,
         position_ids=None,
         head_mask=None,
+        z_input_strategy=None,
+        projected_z=None,
+        where_to_plug_z=None,
+        layers_to_inject=[],
         inputs_embeds=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
@@ -753,6 +758,15 @@ class GPT2Model(GPT2PreTrainedModel):
         output_hidden_states=None,
         return_dict=None,
     ):
+        if z_input_strategy is not None:
+            z_input_strategies = ['prompt', 'inject', 'inject_first']
+            if z_input_strategy not in z_input_strategies:
+                raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
+
+        if z_input_strategy == 'prompt' and projected_z is not None:
+            encoder_outputs = tuple([projected_z[i] for i in range(projected_z.size(1))])
+            raise NotImplementedError('not implemented')
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -836,6 +850,11 @@ class GPT2Model(GPT2PreTrainedModel):
 
         hidden_states = self.drop(hidden_states)
 
+        if z_input_strategy in ['inject', 'inject_first'] and projected_z is not None and 'embedding' in where_to_plug_z:
+            hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                      projected_z=projected_z,
+                                                      z_input_strategy=z_input_strategy)
+
         output_shape = input_shape + (hidden_states.size(-1),)
 
         presents = () if use_cache else None
@@ -895,6 +914,22 @@ class GPT2Model(GPT2PreTrainedModel):
                 )
 
             hidden_states = outputs[0]
+
+            if z_input_strategy in ['inject', 'inject_first'] and projected_z is not None:
+                if 'every_layer' in where_to_plug_z:
+                    hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                              projected_z=projected_z,
+                                                              z_input_strategy=z_input_strategy)
+                elif 'last_2_layers' in where_to_plug_z and (
+                        idx == len(self.layers) - 1 or idx == len(self.layers) - 2):
+                    hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                              projected_z=projected_z,
+                                                              z_input_strategy=z_input_strategy)
+                elif idx in layers_to_inject and 'feedforward' in where_to_plug_z:
+                    hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                              projected_z=projected_z,
+                                                              z_input_strategy=z_input_strategy)
+
             if use_cache is True:
                 presents = presents + (outputs[1],)
 
@@ -953,6 +988,8 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         self.model_parallel = False
         self.device_map = None
 
+        self.plugged_prompt_in = False
+
     @add_start_docstrings(PARALLELIZE_DOCSTRING)
     def parallelize(self, device_map=None):
         self.device_map = (
@@ -1005,6 +1042,10 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "token_type_ids": token_type_ids,
+            "z_input_strategy": kwargs["z_input_strategy"],
+            "projected_z": kwargs["projected_z"],
+            "where_to_plug_z": kwargs["where_to_plug_z"],
+            "layers_to_inject": kwargs["layers_to_inject"],
         }
 
     @add_start_docstrings_to_model_forward(GPT2_INPUTS_DOCSTRING)
@@ -1022,6 +1063,10 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         token_type_ids=None,
         position_ids=None,
         head_mask=None,
+        z_input_strategy=None,
+        projected_z=None,
+        where_to_plug_z=None,
+        layers_to_inject=[],
         inputs_embeds=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
@@ -1037,6 +1082,15 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             ``labels = input_ids`` Indices are selected in ``[-100, 0, ..., config.vocab_size]`` All labels set to
             ``-100`` are ignored (masked), the loss is only computed for labels in ``[0, ..., config.vocab_size]``
         """
+
+        if z_input_strategy is not None:
+            z_input_strategies = ['prompt', 'inject', 'inject_first']
+            if z_input_strategy not in z_input_strategies:
+                raise ValueError(f"z_input_strategy needs to be one of {z_input_strategies}, but is {z_input_strategy}")
+
+        if self.plugged_prompt_in:
+            projected_z = None
+
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         transformer_outputs = self.transformer(
@@ -1046,6 +1100,10 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             head_mask=head_mask,
+            z_input_strategy=z_input_strategy,
+            projected_z=projected_z,
+            where_to_plug_z=where_to_plug_z,
+            layers_to_inject=layers_to_inject,
             inputs_embeds=inputs_embeds,
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
