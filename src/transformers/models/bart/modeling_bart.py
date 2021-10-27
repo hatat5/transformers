@@ -1143,6 +1143,8 @@ class BartModel(BartPretrainedModel):
 
         self.init_weights()
 
+        self.plugged_prompt_in = False
+
     def get_input_embeddings(self):
         return self.shared
 
@@ -1210,7 +1212,7 @@ class BartModel(BartPretrainedModel):
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        if encoder_outputs is None:
+        if encoder_outputs is None and projected_z is None and self.plugged_prompt_in is False:
             encoder_outputs = self.encoder(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
@@ -1220,6 +1222,8 @@ class BartModel(BartPretrainedModel):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
             )
+        else:
+            encoder_outputs = [None]
         # If the user passed a tuple for encoder_outputs, we wrap it in a BaseModelOutput when return_dict=True
         elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
             encoder_outputs = BaseModelOutput(
@@ -1247,6 +1251,10 @@ class BartModel(BartPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+
+        if projected_z is not None and self.plugged_prompt_in is False:
+            if z_input_strategy == 'prompt' or z_input_strategy == 'inject_first':
+                self.plugged_prompt_in = True
 
         if not return_dict:
             return decoder_outputs + encoder_outputs
