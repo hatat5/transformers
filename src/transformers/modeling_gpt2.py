@@ -858,9 +858,9 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         hidden_states = transformer_outputs[0]
 
         if z_input_strategy in ['inject', 'inject_first'] and projected_z_conditioning is not None and 'lm_head' in where_to_plug_z:
-            hidden_states = hidden_states + self.transformer.process_z(hidden_states=hidden_states,
-                                                                       projected_z_conditioning=projected_z_conditioning,
-                                                                       z_input_strategy=z_input_strategy)
+            hidden_states = hidden_states + process_z(hidden_states=hidden_states,
+                                                      projected_z_conditioning=projected_z_conditioning,
+                                                      z_input_strategy=z_input_strategy)
 
         lm_logits = self.lm_head(hidden_states)
 
