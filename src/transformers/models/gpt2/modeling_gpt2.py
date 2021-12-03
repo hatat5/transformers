@@ -383,9 +383,7 @@ class SteeringBlock(nn.Module):
                 output_attentions=output_attentions,
             )
 
-        import ipdb; ipdb.set_trace()
-
-        base_outs = self.alpha * (expert_outs[0] - anti_expert_outs[0]), base_outs[1:]
+        base_outs = base_outs + self.alpha * (expert_outs[0] - anti_expert_outs[0]), base_outs[1:]
 
         return base_outs
 
