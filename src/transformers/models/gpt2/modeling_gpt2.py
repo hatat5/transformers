@@ -384,7 +384,7 @@ class SteeringBlock(nn.Module):
                 output_attentions=output_attentions,
             )
 
-        base_outs = torch.tensor(self.alpha).to(self.device) * (expert_outs[0] - anti_expert_outs[0])
+        base_outs = self.alpha * (expert_outs[0] - anti_expert_outs[0])
         return base_outs
 
 
