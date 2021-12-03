@@ -37,7 +37,60 @@ else:
     absl.logging.set_stderrthreshold("info")
     absl.logging._warn_preinit_stderr = False
 
+<<<<<<< HEAD
 from typing import TYPE_CHECKING
+=======
+# Configurations
+from .configuration_albert import ALBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, AlbertConfig
+from .configuration_auto import ALL_PRETRAINED_CONFIG_ARCHIVE_MAP, CONFIG_MAPPING, AutoConfig
+from .configuration_bart import BartConfig
+from .configuration_bert import BERT_PRETRAINED_CONFIG_ARCHIVE_MAP, BertConfig
+from .configuration_basic_tm import BasicTMEncoderConfig, BasicTMDecoderConfig
+from .configuration_camembert import CAMEMBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, CamembertConfig
+from .configuration_ctrl import CTRL_PRETRAINED_CONFIG_ARCHIVE_MAP, CTRLConfig
+from .configuration_distilbert import DISTILBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, DistilBertConfig
+from .configuration_dpr import DPR_PRETRAINED_CONFIG_ARCHIVE_MAP, DPRConfig
+from .configuration_electra import ELECTRA_PRETRAINED_CONFIG_ARCHIVE_MAP, ElectraConfig
+from .configuration_encoder_decoder import EncoderDecoderConfig
+from .configuration_flaubert import FLAUBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, FlaubertConfig
+from .configuration_gpt2 import GPT2_PRETRAINED_CONFIG_ARCHIVE_MAP, GPT2Config
+from .configuration_longformer import LONGFORMER_PRETRAINED_CONFIG_ARCHIVE_MAP, LongformerConfig
+from .configuration_lxmert import LXMERT_PRETRAINED_CONFIG_ARCHIVE_MAP, LxmertConfig
+from .configuration_marian import MarianConfig
+from .configuration_mbart import MBartConfig
+from .configuration_mmbt import MMBTConfig
+from .configuration_mobilebert import MOBILEBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, MobileBertConfig
+from .configuration_openai import OPENAI_GPT_PRETRAINED_CONFIG_ARCHIVE_MAP, OpenAIGPTConfig
+from .configuration_pegasus import PegasusConfig
+from .configuration_reformer import REFORMER_PRETRAINED_CONFIG_ARCHIVE_MAP, ReformerConfig
+from .configuration_retribert import RETRIBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, RetriBertConfig
+from .configuration_roberta import ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP, RobertaConfig
+from .configuration_t5 import T5_PRETRAINED_CONFIG_ARCHIVE_MAP, T5Config
+from .configuration_transfo_xl import TRANSFO_XL_PRETRAINED_CONFIG_ARCHIVE_MAP, TransfoXLConfig
+from .configuration_utils import PretrainedConfig
+from .configuration_xlm import XLM_PRETRAINED_CONFIG_ARCHIVE_MAP, XLMConfig
+from .configuration_xlm_roberta import XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP, XLMRobertaConfig
+from .configuration_xlnet import XLNET_PRETRAINED_CONFIG_ARCHIVE_MAP, XLNetConfig
+from .data import (
+    DataProcessor,
+    InputExample,
+    InputFeatures,
+    SingleSentenceClassificationProcessor,
+    SquadExample,
+    SquadFeatures,
+    SquadV1Processor,
+    SquadV2Processor,
+    glue_convert_examples_to_features,
+    glue_output_modes,
+    glue_processors,
+    glue_tasks_num_labels,
+    is_sklearn_available,
+    squad_convert_examples_to_features,
+    xnli_output_modes,
+    xnli_processors,
+    xnli_tasks_num_labels,
+)
+>>>>>>> 21196c5403f8f2bb6335c03868cb26ef303e8cba
 
 # Check the dependencies satisfy the minimal versions required.
 from . import dependency_versions_check
@@ -2089,7 +2142,272 @@ if TYPE_CHECKING:
         DataCollatorWithPadding,
         default_data_collator,
     )
+<<<<<<< HEAD
     from .feature_extraction_sequence_utils import SequenceFeatureExtractor
+=======
+    from .data.datasets import (
+        GlueDataset,
+        GlueDataTrainingArguments,
+        LineByLineTextDataset,
+        SquadDataset,
+        SquadDataTrainingArguments,
+        TextDataset,
+        TextDatasetForNextSentencePrediction,
+    )
+    from .generation_utils import top_k_top_p_filtering
+    from .modeling_albert import (
+        ALBERT_PRETRAINED_MODEL_ARCHIVE_LIST,
+        AlbertForMaskedLM,
+        AlbertForMultipleChoice,
+        AlbertForPreTraining,
+        AlbertForQuestionAnswering,
+        AlbertForSequenceClassification,
+        AlbertForTokenClassification,
+        AlbertModel,
+        AlbertPreTrainedModel,
+        load_tf_weights_in_albert,
+    )
+    from .modeling_auto import (
+        MODEL_FOR_CAUSAL_LM_MAPPING,
+        MODEL_FOR_MASKED_LM_MAPPING,
+        MODEL_FOR_MULTIPLE_CHOICE_MAPPING,
+        MODEL_FOR_PRETRAINING_MAPPING,
+        MODEL_FOR_QUESTION_ANSWERING_MAPPING,
+        MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING,
+        MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING,
+        MODEL_FOR_TOKEN_CLASSIFICATION_MAPPING,
+        MODEL_MAPPING,
+        MODEL_WITH_LM_HEAD_MAPPING,
+        AutoModel,
+        AutoModelForCausalLM,
+        AutoModelForMaskedLM,
+        AutoModelForMultipleChoice,
+        AutoModelForPreTraining,
+        AutoModelForQuestionAnswering,
+        AutoModelForSeq2SeqLM,
+        AutoModelForSequenceClassification,
+        AutoModelForTokenClassification,
+        AutoModelWithLMHead,
+    )
+    from .modeling_bart import (
+        BART_PRETRAINED_MODEL_ARCHIVE_LIST,
+        BartForConditionalGeneration,
+        BartForQuestionAnswering,
+        BartForSequenceClassification,
+        BartModel,
+        PretrainedBartModel,
+    )
+    from .modeling_bert import (
+        BERT_PRETRAINED_MODEL_ARCHIVE_LIST,
+        BertForMaskedLM,
+        BertForMultipleChoice,
+        BertForNextSentencePrediction,
+        BertForPreTraining,
+        BertForQuestionAnswering,
+        BertForSequenceClassification,
+        BertForTokenClassification,
+        BertLayer,
+        BertLMHeadModel,
+        BertModel,
+        BertPreTrainedModel,
+        load_tf_weights_in_bert,
+    )
+    from .modeling_basic_tm import (
+        PretrainedTranslationModelEncoder,
+        PretrainedTranslationModelDecoder,
+        TranslationModel,
+        NMTEncoder,
+        NMTDecoder,
+    )
+    from .modeling_camembert import (
+        CAMEMBERT_PRETRAINED_MODEL_ARCHIVE_LIST,
+        CamembertForCausalLM,
+        CamembertForMaskedLM,
+        CamembertForMultipleChoice,
+        CamembertForQuestionAnswering,
+        CamembertForSequenceClassification,
+        CamembertForTokenClassification,
+        CamembertModel,
+    )
+    from .modeling_ctrl import CTRL_PRETRAINED_MODEL_ARCHIVE_LIST, CTRLLMHeadModel, CTRLModel, CTRLPreTrainedModel
+    from .modeling_distilbert import (
+        DISTILBERT_PRETRAINED_MODEL_ARCHIVE_LIST,
+        DistilBertForMaskedLM,
+        DistilBertForMultipleChoice,
+        DistilBertForQuestionAnswering,
+        DistilBertForSequenceClassification,
+        DistilBertForTokenClassification,
+        DistilBertModel,
+        DistilBertPreTrainedModel,
+    )
+    from .modeling_dpr import (
+        DPRContextEncoder,
+        DPRPretrainedContextEncoder,
+        DPRPretrainedQuestionEncoder,
+        DPRPretrainedReader,
+        DPRQuestionEncoder,
+        DPRReader,
+    )
+    from .modeling_electra import (
+        ELECTRA_PRETRAINED_MODEL_ARCHIVE_LIST,
+        ElectraForMaskedLM,
+        ElectraForMultipleChoice,
+        ElectraForPreTraining,
+        ElectraForQuestionAnswering,
+        ElectraForSequenceClassification,
+        ElectraForTokenClassification,
+        ElectraModel,
+        ElectraPreTrainedModel,
+        load_tf_weights_in_electra,
+    )
+    from .modeling_encoder_decoder import EncoderDecoderModel
+    from .modeling_flaubert import (
+        FLAUBERT_PRETRAINED_MODEL_ARCHIVE_LIST,
+        FlaubertForMultipleChoice,
+        FlaubertForQuestionAnswering,
+        FlaubertForQuestionAnsweringSimple,
+        FlaubertForSequenceClassification,
+        FlaubertForTokenClassification,
+        FlaubertModel,
+        FlaubertWithLMHeadModel,
+    )
+    from .modeling_gpt2 import (
+        GPT2_PRETRAINED_MODEL_ARCHIVE_LIST,
+        GPT2DoubleHeadsModel,
+        GPT2LMHeadModel,
+        GPT2Model,
+        GPT2PreTrainedModel,
+        load_tf_weights_in_gpt2,
+    )
+    from .modeling_longformer import (
+        LONGFORMER_PRETRAINED_MODEL_ARCHIVE_LIST,
+        LongformerForMaskedLM,
+        LongformerForMultipleChoice,
+        LongformerForQuestionAnswering,
+        LongformerForSequenceClassification,
+        LongformerForTokenClassification,
+        LongformerModel,
+        LongformerSelfAttention,
+    )
+    from .modeling_lxmert import (
+        LxmertEncoder,
+        LxmertForPreTraining,
+        LxmertForQuestionAnswering,
+        LxmertModel,
+        LxmertPreTrainedModel,
+        LxmertVisualFeatureEncoder,
+        LxmertXLayer,
+    )
+    from .modeling_marian import MarianMTModel
+    from .modeling_mbart import MBartForConditionalGeneration
+    from .modeling_mmbt import MMBTForClassification, MMBTModel, ModalEmbeddings
+    from .modeling_mobilebert import (
+        MOBILEBERT_PRETRAINED_MODEL_ARCHIVE_LIST,
+        MobileBertForMaskedLM,
+        MobileBertForMultipleChoice,
+        MobileBertForNextSentencePrediction,
+        MobileBertForPreTraining,
+        MobileBertForQuestionAnswering,
+        MobileBertForSequenceClassification,
+        MobileBertForTokenClassification,
+        MobileBertLayer,
+        MobileBertModel,
+        MobileBertPreTrainedModel,
+        load_tf_weights_in_mobilebert,
+    )
+    from .modeling_openai import (
+        OPENAI_GPT_PRETRAINED_MODEL_ARCHIVE_LIST,
+        OpenAIGPTDoubleHeadsModel,
+        OpenAIGPTLMHeadModel,
+        OpenAIGPTModel,
+        OpenAIGPTPreTrainedModel,
+        load_tf_weights_in_openai_gpt,
+    )
+    from .modeling_pegasus import PegasusForConditionalGeneration
+    from .modeling_reformer import (
+        REFORMER_PRETRAINED_MODEL_ARCHIVE_LIST,
+        ReformerAttention,
+        ReformerForMaskedLM,
+        ReformerForQuestionAnswering,
+        ReformerForSequenceClassification,
+        ReformerLayer,
+        ReformerModel,
+        ReformerModelWithLMHead,
+    )
+    from .modeling_retribert import RETRIBERT_PRETRAINED_MODEL_ARCHIVE_LIST, RetriBertModel, RetriBertPreTrainedModel
+    from .modeling_roberta import (
+        ROBERTA_PRETRAINED_MODEL_ARCHIVE_LIST,
+        RobertaForCausalLM,
+        RobertaForMaskedLM,
+        RobertaForMultipleChoice,
+        RobertaForQuestionAnswering,
+        RobertaForSequenceClassification,
+        RobertaForTokenClassification,
+        RobertaModel,
+    )
+    from .modeling_t5 import (
+        T5_PRETRAINED_MODEL_ARCHIVE_LIST,
+        T5ForConditionalGeneration,
+        T5Model,
+        T5PreTrainedModel,
+        load_tf_weights_in_t5,
+    )
+    from .modeling_transfo_xl import (
+        TRANSFO_XL_PRETRAINED_MODEL_ARCHIVE_LIST,
+        AdaptiveEmbedding,
+        TransfoXLLMHeadModel,
+        TransfoXLModel,
+        TransfoXLPreTrainedModel,
+        load_tf_weights_in_transfo_xl,
+    )
+    from .modeling_utils import Conv1D, PreTrainedModel, apply_chunking_to_forward, prune_layer
+    from .modeling_xlm import (
+        XLM_PRETRAINED_MODEL_ARCHIVE_LIST,
+        XLMForMultipleChoice,
+        XLMForQuestionAnswering,
+        XLMForQuestionAnsweringSimple,
+        XLMForSequenceClassification,
+        XLMForTokenClassification,
+        XLMModel,
+        XLMPreTrainedModel,
+        XLMWithLMHeadModel,
+    )
+    from .modeling_xlm_roberta import (
+        XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_LIST,
+        XLMRobertaForCausalLM,
+        XLMRobertaForMaskedLM,
+        XLMRobertaForMultipleChoice,
+        XLMRobertaForQuestionAnswering,
+        XLMRobertaForSequenceClassification,
+        XLMRobertaForTokenClassification,
+        XLMRobertaModel,
+    )
+    from .modeling_xlnet import (
+        XLNET_PRETRAINED_MODEL_ARCHIVE_LIST,
+        XLNetForMultipleChoice,
+        XLNetForQuestionAnswering,
+        XLNetForQuestionAnsweringSimple,
+        XLNetForSequenceClassification,
+        XLNetForTokenClassification,
+        XLNetLMHeadModel,
+        XLNetModel,
+        XLNetPreTrainedModel,
+        load_tf_weights_in_xlnet,
+    )
+
+    # Optimization
+    from .optimization import (
+        Adafactor,
+        AdamW,
+        get_constant_schedule,
+        get_constant_schedule_with_warmup,
+        get_cosine_schedule_with_warmup,
+        get_cosine_with_hard_restarts_schedule_with_warmup,
+        get_linear_schedule_with_warmup,
+        get_polynomial_decay_schedule_with_warmup,
+    )
+    from .tokenization_marian import MarianTokenizer
+>>>>>>> 21196c5403f8f2bb6335c03868cb26ef303e8cba
 
     # Feature Extractor
     from .feature_extraction_utils import BatchFeature
