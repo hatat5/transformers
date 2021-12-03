@@ -474,7 +474,7 @@ class SteeringBlock(nn.Module):
             output_attentions=output_attentions,
         )
 
-        expert_outs, anti_expert_outs, steering_offset = base_outs, base_outs, base_outs[0] - base_outs[0]
+        expert_outs, anti_expert_outs = base_outs, base_outs,
 
         if self.expert_block is not None:
             expert_outs = self.expert_block(
