@@ -18,7 +18,7 @@
 import math
 import os
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import torch
 import torch.utils.checkpoint
@@ -442,15 +442,15 @@ class GPT2Block(nn.Module):
 
 
 class SteeringBlock(nn.Module):
-    def __init__(self, block_list: List[Block], alpha: float = 0):
+    def __init__(self, block_list: List[GPT2Block], alpha: float = 0):
         super().__init__()
         assert len(block_list) == 3
         self.alpha = alpha
-        self.base_block: Block = block_list[0]
+        self.base_block: GPT2Block = block_list[0]
         assert self.base_block is not None
 
-        self.expert_block: Block = block_list[1]
-        self.anti_expert_block: Block = block_list[2]
+        self.expert_block: GPT2Block = block_list[1]
+        self.anti_expert_block: GPT2Block= block_list[2]
 
     def forward(
             self,
@@ -845,7 +845,7 @@ class GPT2Model(GPT2PreTrainedModel):
     def get_input_embeddings(self):
         return self.wte
 
-    def set_steering_layer(self, layer_num: int, base_block: Block, expert_block: Block, anti_expert_block: Block, alpha: float):
+    def set_steering_layer(self, layer_num: int, base_block: GPT2Block, expert_block: GPT2Block, anti_expert_block: GPT2Block, alpha: float):
         self.h[layer_num] = SteeringBlock(block_list=[base_block, expert_block, anti_expert_block], alpha=alpha)
 
     def set_input_embeddings(self, new_embeddings):
