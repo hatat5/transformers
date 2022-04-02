@@ -442,10 +442,16 @@ class GPT2Block(nn.Module):
 
 
 class SteeringBlock(nn.Module):
-    def __init__(self, block_list: List[GPT2Block], alpha: float = 0):
+    def __init__(
+        self,
+        block_list: List[GPT2Block],
+        alpha: float = 0,
+        beta: Optional[float] = None
+    ):
         super().__init__()
         assert len(block_list) == 3
         self.alpha = alpha
+        self.beta = beta
         self.base_block: GPT2Block = block_list[0]
         assert self.base_block is not None
 
@@ -500,7 +506,7 @@ class SteeringBlock(nn.Module):
                 output_attentions=output_attentions,
             )
 
-        base_outs = base_outs[0] + self.alpha * (expert_outs[0] - anti_expert_outs[0]), base_outs[1:]
+        base_outs = base_outs[0] + self.alpha * expert_outs[0] - self.beta * anti_expert_outs[0], base_outs[1:]
 
         return base_outs
 
@@ -845,8 +851,19 @@ class GPT2Model(GPT2PreTrainedModel):
     def get_input_embeddings(self):
         return self.wte
 
-    def set_steering_layer(self, layer_num: int, base_block: GPT2Block, expert_block: GPT2Block, anti_expert_block: GPT2Block, alpha: float):
-        self.h[layer_num] = SteeringBlock(block_list=[base_block, expert_block, anti_expert_block], alpha=alpha)
+    def set_steering_layer(self,
+                           layer_num: int,
+                           base_block: GPT2Block,
+                           expert_block: GPT2Block,
+                           anti_expert_block: GPT2Block,
+                           alpha: float,
+                           beta: Optional[float],
+    ):
+        self.h[layer_num] = SteeringBlock(
+            block_list=[base_block, expert_block, anti_expert_block],
+            alpha=alpha,
+            beta=beta
+        )
 
     def set_input_embeddings(self, new_embeddings):
         self.wte = new_embeddings
