@@ -511,15 +511,35 @@ class SteeringBlock(nn.Module):
         #base_outs = base_outs[0] + self.alpha * expert_outs[0] - self.beta * anti_expert_outs[0], base_outs[1:]
 
         # First normalize each of the outs before adding them together
-        import ipdb; ipdb.set_trace()
-        #base_mean = torch.mean(base_outs)
+        #import ipdb; ipdb.set_trace()
+        base_mean = torch.mean(base_outs, dim=2, keepdim=True)
+        base_var = torch.var(base_outs, dim=2, keepdim=True)
 
+        if self.expert_block is not None:
+            expert_mean = torch.mean(expert_outs, dim=2, keepdim=True)
+            expert_var = torch.var(expert_outs, dim=2, keepdim=True)
 
-        base_outs = self.alpha_base * base_outs[0] + \
-                    self.alpha_expert * expert_outs[0] + \
-                    self.alpha_antiexpert * anti_expert_outs[0], base_outs[1:]
+        if self.anti_expert_block is not None:
+            antiexpert_mean = torch.mean(anti_expert_outs, dim=2, keepdim=True)
+            antiexpert_var = torch.var(anti_expert_outs, dim=2, keepdim=True)
 
-        return base_outs
+        base_outs_norm = (base_outs - base_mean) / torch.sqrt(base_var)
+
+        if self.expert_block is not None:
+            expert_outs_norm = (expert_outs - expert_mean) / torch.sqrt(expert_var)
+        else:
+            expert_outs_norm = base_outs_norm
+
+        if self.anti_expert_block is not None:
+            anti_expert_outs_norm = (anti_expert_outs - antiexpert_mean) / torch.sqrt(antiexpert_var)
+        else:
+            anti_expert_outs_norm = base_outs_norm
+
+        ensemble_outs = self.alpha_base * base_outs_norm[0] + \
+                        self.alpha_expert * expert_outs_norm[0] + \
+                        self.alpha_antiexpert * anti_expert_outs_norm[0], base_outs[1:]
+
+        return ensemble_outs
 
 
 class GPT2PreTrainedModel(PreTrainedModel):
