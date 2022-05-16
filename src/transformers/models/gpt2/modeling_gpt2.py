@@ -446,8 +446,8 @@ class SteeringBlock(nn.Module):
         self,
         block_list: List[GPT2Block],
         alpha_base: float = 0,
-        alpha_expert: Optional[float] = None,
-        alpha_antiexpert: Optional[float] = None,
+        alpha_expert: Optional[float] = 0,
+        alpha_antiexpert: Optional[float] = 0,
     ):
         super().__init__()
         assert len(block_list) == 3
@@ -458,7 +458,7 @@ class SteeringBlock(nn.Module):
         assert self.base_block is not None
 
         self.expert_block: GPT2Block = block_list[1]
-        self.anti_expert_block: GPT2Block= block_list[2]
+        self.anti_expert_block: GPT2Block = block_list[2]
 
     def forward(
             self,
@@ -511,7 +511,7 @@ class SteeringBlock(nn.Module):
         #base_outs = base_outs[0] + self.alpha * expert_outs[0] - self.beta * anti_expert_outs[0], base_outs[1:]
 
         # First normalize each of the outs before adding them together
-        #import ipdb; ipdb.set_trace()
+        import ipdb; ipdb.set_trace()
         base_mean = torch.mean(base_outs[0], dim=2, keepdim=True)
         base_var = torch.var(base_outs[0], dim=2, keepdim=True)
 
@@ -888,8 +888,8 @@ class GPT2Model(GPT2PreTrainedModel):
                            expert_block: GPT2Block,
                            anti_expert_block: GPT2Block,
                            alpha_base: float,
-                           alpha_expert: Optional[float],
-                           alpha_antiexpert: Optional[float],
+                           alpha_expert: Optional[float] = 0,
+                           alpha_antiexpert: Optional[float] = 0,
     ):
         self.h[layer_num] = SteeringBlock(
             block_list=[base_block, expert_block, anti_expert_block],
