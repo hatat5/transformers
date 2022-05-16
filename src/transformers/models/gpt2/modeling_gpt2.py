@@ -511,7 +511,6 @@ class SteeringBlock(nn.Module):
         #base_outs = base_outs[0] + self.alpha * expert_outs[0] - self.beta * anti_expert_outs[0], base_outs[1:]
 
         # First normalize each of the outs before adding them together
-        import ipdb; ipdb.set_trace()
         base_mean = torch.mean(base_outs[0], dim=2, keepdim=True)
         base_var = torch.var(base_outs[0], dim=2, keepdim=True)
 
