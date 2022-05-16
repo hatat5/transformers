@@ -524,6 +524,11 @@ class SteeringBlock(nn.Module):
             antiexpert_var = torch.var(anti_expert_outs[0], dim=2, keepdim=True)
 
         base_outs_norm = (base_outs[0] - base_mean) / torch.sqrt(base_var)
+        base_outs_norm_tuple = (
+            (base_outs[1][0] - torch.mean(base_outs[1][0], dim=3, keepdim=True)) / torch.sqrt(torch.var(base_outs[1][0], dim=3, keepdim=True))
+            (base_outs[1][1] - torch.mean(base_outs[1][1], dim=3, keepdim=True)) / torch.sqrt(
+                torch.var(base_outs[1][1], dim=3, keepdim=True))
+        )
 
         if self.expert_block is not None:
             expert_outs_norm = (expert_outs[0] - expert_mean) / torch.sqrt(expert_var)
@@ -535,10 +540,13 @@ class SteeringBlock(nn.Module):
         else:
             anti_expert_outs_norm = base_outs_norm
 
+        #ensemble_outs = self.alpha_base * base_outs_norm + \
+        #                self.alpha_expert * expert_outs_norm + \
+        #                self.alpha_antiexpert * anti_expert_outs_norm, base_outs[1:]
+
         ensemble_outs = self.alpha_base * base_outs_norm + \
                         self.alpha_expert * expert_outs_norm + \
-                        self.alpha_antiexpert * anti_expert_outs_norm, base_outs[1:]
-
+                        self.alpha_antiexpert * anti_expert_outs_norm, base_outs_norm_tuple
         #ensemble_outs = self.alpha_base * base_outs[0], base_outs[1:]
 
         return ensemble_outs
