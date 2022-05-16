@@ -524,7 +524,7 @@ class SteeringBlock(nn.Module):
 
         base_outs_norm = (base_outs[0] - base_mean) / torch.sqrt(base_var)
         base_outs_norm_tuple = (
-            (base_outs[1][0] - torch.mean(base_outs[1][0], dim=3, keepdim=True)) / torch.sqrt(torch.var(base_outs[1][0], dim=3, keepdim=True))
+            (base_outs[1][0] - torch.mean(base_outs[1][0], dim=3, keepdim=True)) / torch.sqrt(torch.var(base_outs[1][0], dim=3, keepdim=True)),
             (base_outs[1][1] - torch.mean(base_outs[1][1], dim=3, keepdim=True)) / torch.sqrt(
                 torch.var(base_outs[1][1], dim=3, keepdim=True))
         )
