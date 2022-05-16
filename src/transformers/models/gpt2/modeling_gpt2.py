@@ -539,7 +539,7 @@ class SteeringBlock(nn.Module):
                         self.alpha_expert * expert_outs_norm + \
                         self.alpha_antiexpert * anti_expert_outs_norm, base_outs[1:]
 
-        ensemble_outs = self.alpha_base * base_outs[0], base_outs[1:]
+        #ensemble_outs = self.alpha_base * base_outs[0], base_outs[1:]
 
         return ensemble_outs
 
