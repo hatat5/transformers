@@ -389,10 +389,11 @@ class GPT2Block(nn.Module):
         encoder_attention_mask=None,
         use_cache=False,
         output_attentions=False,
-        input_residual=None,
+        residual=None,
     ):
-        if input_residual is None:
+        if residual is None:
             residual = hidden_states
+
         hidden_states = self.ln_1(hidden_states)
         attn_outputs = self.attn(
             hidden_states,
@@ -472,7 +473,7 @@ class SteeringBlock(nn.Module):
             encoder_attention_mask=None,
             use_cache=False,
             output_attentions=False,
-            input_residual=None,
+            residual=None,
     ):
         base_outs = self.base_block(
             hidden_states=hidden_states,
@@ -1031,7 +1032,7 @@ class GPT2Model(GPT2PreTrainedModel):
         all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
         all_hidden_states = () if output_hidden_states else None
 
-        input_residual = None # Hacky solution to the steering problem with steerable blocks. Set to None for default behavior.
+        residual = None # Hacky solution to the steering problem with steerable blocks. Set to None for default behavior.
 
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
             # Model parallel
@@ -1071,7 +1072,7 @@ class GPT2Model(GPT2PreTrainedModel):
                     head_mask[i],
                     encoder_hidden_states,
                     encoder_attention_mask,
-                    input_residual=input_residual,
+                    residual=residual,
                 )
             else:
                 outputs = block(
@@ -1083,7 +1084,7 @@ class GPT2Model(GPT2PreTrainedModel):
                     encoder_attention_mask=encoder_attention_mask,
                     use_cache=use_cache,
                     output_attentions=output_attentions,
-                    input_residual=input_residual,
+                    residual=residual,
                 )
 
             hidden_states = outputs[0]
@@ -1096,9 +1097,9 @@ class GPT2Model(GPT2PreTrainedModel):
                     all_cross_attentions = all_cross_attentions + (outputs[3 if use_cache else 2],)
 
             if type(block) is SteeringBlock:
-                input_residual = outputs[-1]
+                residual = outputs[-1]
             else:
-                input_residual = None
+                residual = None
 
 
                 # Model Parallel: If it's the last layer for that device, put things on the next device
