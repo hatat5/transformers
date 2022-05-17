@@ -389,8 +389,10 @@ class GPT2Block(nn.Module):
         encoder_attention_mask=None,
         use_cache=False,
         output_attentions=False,
+        input_residual=None,
     ):
-        residual = hidden_states
+        if input_residual is None:
+            residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
         attn_outputs = self.attn(
             hidden_states,
@@ -470,6 +472,7 @@ class SteeringBlock(nn.Module):
             encoder_attention_mask=None,
             use_cache=False,
             output_attentions=False,
+            input_residual=None,
     ):
         base_outs = self.base_block(
             hidden_states=hidden_states,
@@ -523,11 +526,6 @@ class SteeringBlock(nn.Module):
             antiexpert_var = torch.var(anti_expert_outs[0], dim=2, keepdim=True)
 
         base_outs_norm = (base_outs[0] - base_mean) / torch.sqrt(base_var)
-        base_outs_norm_tuple = (
-            (base_outs[1][0] - torch.mean(base_outs[1][0], dim=3, keepdim=True)) / torch.sqrt(torch.var(base_outs[1][0], dim=3, keepdim=True)),
-            (base_outs[1][1] - torch.mean(base_outs[1][1], dim=3, keepdim=True)) / torch.sqrt(
-                torch.var(base_outs[1][1], dim=3, keepdim=True))
-        )
 
         if self.expert_block is not None:
             expert_outs_norm = (expert_outs[0] - expert_mean) / torch.sqrt(expert_var)
@@ -545,7 +543,10 @@ class SteeringBlock(nn.Module):
 
         ensemble_outs = self.alpha_base * base_outs_norm + \
                         self.alpha_expert * expert_outs_norm + \
-                        self.alpha_antiexpert * anti_expert_outs_norm, base_outs_norm_tuple
+                        self.alpha_antiexpert * anti_expert_outs_norm, \
+                        base_outs[1:], \
+                        base_outs[0],
+
         #ensemble_outs = self.alpha_base * base_outs[0], base_outs[1:]
 
         return ensemble_outs
@@ -1029,8 +1030,10 @@ class GPT2Model(GPT2PreTrainedModel):
         all_self_attentions = () if output_attentions else None
         all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
         all_hidden_states = () if output_hidden_states else None
-        for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
 
+        input_residual = None # Hacky solution to the steering problem with steerable blocks. Set to None for default behavior.
+
+        for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
             # Model parallel
             if self.model_parallel:
                 torch.cuda.set_device(hidden_states.device)
@@ -1068,6 +1071,7 @@ class GPT2Model(GPT2PreTrainedModel):
                     head_mask[i],
                     encoder_hidden_states,
                     encoder_attention_mask,
+                    input_residual=input_residual,
                 )
             else:
                 outputs = block(
@@ -1079,6 +1083,7 @@ class GPT2Model(GPT2PreTrainedModel):
                     encoder_attention_mask=encoder_attention_mask,
                     use_cache=use_cache,
                     output_attentions=output_attentions,
+                    input_residual=input_residual,
                 )
 
             hidden_states = outputs[0]
@@ -1090,7 +1095,14 @@ class GPT2Model(GPT2PreTrainedModel):
                 if self.config.add_cross_attention:
                     all_cross_attentions = all_cross_attentions + (outputs[3 if use_cache else 2],)
 
-            # Model Parallel: If it's the last layer for that device, put things on the next device
+            import ipdb; ipdb.set_trace()
+            if type(block) is SteeringBlock:
+                input_residual = hidden_states[-1]
+            else:
+                input_residual = None
+
+
+                # Model Parallel: If it's the last layer for that device, put things on the next device
             if self.model_parallel:
                 for k, v in self.device_map.items():
                     if i == v[-1] and "cuda:" + str(k) != self.last_device:
