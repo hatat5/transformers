@@ -1095,9 +1095,8 @@ class GPT2Model(GPT2PreTrainedModel):
                 if self.config.add_cross_attention:
                     all_cross_attentions = all_cross_attentions + (outputs[3 if use_cache else 2],)
 
-            import ipdb; ipdb.set_trace()
             if type(block) is SteeringBlock:
-                input_residual = hidden_states[-1]
+                input_residual = outputs[-1]
             else:
                 input_residual = None
 
