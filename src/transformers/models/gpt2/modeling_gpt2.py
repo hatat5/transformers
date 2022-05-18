@@ -542,11 +542,16 @@ class SteeringBlock(nn.Module):
         #                self.alpha_expert * expert_outs_norm + \
         #                self.alpha_antiexpert * anti_expert_outs_norm, base_outs[1:]
 
+        if self.alpha_expert is not None:
+            residual = expert_outs[0]
+        else:
+            residual = base_outs[0]
+
         ensemble_outs = self.alpha_base * base_outs_norm + \
                         self.alpha_expert * expert_outs_norm + \
                         self.alpha_antiexpert * anti_expert_outs_norm, \
                         base_outs[1:], \
-                        base_outs[0],
+                        residual,
 
         #ensemble_outs = self.alpha_base * base_outs[0], base_outs[1:]
 
