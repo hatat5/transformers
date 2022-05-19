@@ -542,20 +542,33 @@ class SteeringBlock(nn.Module):
         #                self.alpha_expert * expert_outs_norm + \
         #                self.alpha_antiexpert * anti_expert_outs_norm, base_outs[1:]
 
-        if self.alpha_expert is not None:
-            residual = expert_outs[0]
-        else:
-            residual = base_outs[0]
+        #if self.alpha_expert is not None:
+        #    residual = expert_outs[0]
+        #else:
+        #    residual = base_outs[0]
+
 
         ensemble_outs = self.alpha_base * base_outs_norm + \
                         self.alpha_expert * expert_outs_norm + \
-                        self.alpha_antiexpert * anti_expert_outs_norm, \
-                        base_outs[1:], \
-                        residual,
+                        self.alpha_antiexpert * anti_expert_outs_norm
 
+        # Rescale to be like the expert model
+        ensemble_mean = torch.mean(ensemble_outs, dim=2, keepdim=True)
+        ensemble_var = torch.var(ensemble_outs, dim=2, keepdim=True)
+
+        standard_dev_ratio = torch.sqrt(expert_var) / torch.sqrt(ensemble_var)
+
+        # Make the standard deviation (variance) equal to that of the expert model
+        ensemble_outs_rescaled = ensemble_outs * standard_dev_ratio
+
+        # Make the mean equal to that of the expert model
+        ensemble_outs_rescaled = ensemble_outs_rescaled + expert_mean - ensemble_mean * standard_dev_ratio
+
+        residual = None
+
+        return ensemble_outs_rescaled, base_outs[1:], residual
         #ensemble_outs = self.alpha_base * base_outs[0], base_outs[1:]
 
-        return ensemble_outs
 
 
 class GPT2PreTrainedModel(PreTrainedModel):
