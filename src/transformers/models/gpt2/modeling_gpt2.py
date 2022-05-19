@@ -920,7 +920,6 @@ class GPT2Model(GPT2PreTrainedModel):
                            alpha_expert: Optional[float] = 0,
                            alpha_antiexpert: Optional[float] = 0,
     ):
-        import ipdb; ipdb.set_trace()
         self.h[layer_num] = SteeringBlock(
             block_list=[base_block, expert_block, anti_expert_block],
             alpha_base=alpha_base,
